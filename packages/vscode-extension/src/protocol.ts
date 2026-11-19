@@ -200,6 +200,8 @@ export type SessionActivity = "running" | "done";
 export interface SessionListItem {
 	path: string;
 	label: string;
+	/** Origin of a derived chat. Null when the original is no longer listed in this history. */
+	origin?: { path: string; label: string } | null;
 	/** First line of the session's first prompt. */
 	firstPrompt?: string;
 	/** First line of its latest prompt; absent when the session has a single prompt, or unknown. */
@@ -208,8 +210,10 @@ export interface SessionListItem {
 	firstPromptFull?: string;
 	/** The whole latest prompt, the same way; absent when `lastPrompt` is. */
 	lastPromptFull?: string;
-	/** When MarIA Code last replied (epoch ms; see `SessionSummary.lastReply`); the panel groups chats by its calendar day and shows their age. */
+	/** When MarIA Code last replied (epoch ms; see `SessionSummary.lastReply`). */
 	lastReply: number;
+	/** Last reply or, for a new branch with inherited replies, the date it was created. */
+	historyAt: number;
 	/** When the session started (epoch ms); the Today cards show it with how long the chat ran. */
 	created?: number;
 	/** User and assistant messages counted; a lower bound when `messagesPartial`. */

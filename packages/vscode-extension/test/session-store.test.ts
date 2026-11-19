@@ -3,7 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { quotedPrompt } from "../src/quoted-prompt";
-import { guessSessionDir, listSessions, sessionLabel } from "../src/sessions/session-store";
+import { guessSessionDir, listSessions, sessionLabel, sessionOrigins } from "../src/sessions/session-store";
 
 const dirs: string[] = [];
 
@@ -24,9 +24,17 @@ function sessionFile(options: {
 	prompts: string[];
 	padding?: number;
 	timestamp?: string;
+	parentSession?: string;
 }): string {
 	const slot = JSON.stringify({ type: "title", v: 1, title: options.title ?? "", updatedAt: "x", pad: "" });
-	const header = { type: "session", version: 3, id: options.id, cwd: "/w", timestamp: options.timestamp };
+	const header = {
+		type: "session",
+		version: 3,
+		id: options.id,
+		cwd: "/w",
+		timestamp: options.timestamp,
+		parentSession: options.parentSession,
+	};
 	const lines = [slot, JSON.stringify(header)];
 	for (const prompt of options.prompts) {
 		lines.push(
@@ -43,6 +51,24 @@ function sessionFile(options: {
 }
 
 describe("listSessions", () => {
+	it("finds each branch's immediate origin from its persisted path or ID and keeps the mark after deletion", async () => {
+		const dir = await tempDir();
+		const original = path.join(dir, "2026-01-01_original.jsonl");
+		const branch = path.join(dir, "2026-01-02_branch.jsonl");
+		const nested = path.join(dir, "2026-01-03_nested.jsonl");
+		await Bun.write(original, sessionFile({ id: "original", title: "Renamed original", prompts: ["hi"] }));
+		await Bun.write(branch, sessionFile({ id: "branch", prompts: ["hi"], parentSession: original }));
+		await Bun.write(nested, sessionFile({ id: "nested", prompts: ["hi"], parentSession: "branch" }));
+
+		const origins = sessionOrigins(await listSessions(dir));
+		expect(origins.get(branch)).toMatchObject({ path: original, title: "Renamed original" });
+		expect(origins.get(nested)).toMatchObject({ path: branch });
+		expect(origins.has(original)).toBe(false);
+
+		await fs.unlink(original);
+		expect(sessionOrigins(await listSessions(dir)).get(branch)).toBeNull();
+	});
+
 	it("lists sessions newest first, labelled by title or first prompt, skipping empty ones", async () => {
 		const dir = await tempDir();
 		const older = path.join(dir, "2026-01-01_a.jsonl");

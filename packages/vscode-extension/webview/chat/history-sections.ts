@@ -1,7 +1,7 @@
 /**
  * Where each chat of the history panel goes and how its row reads, apart from the
- * DOM so the rules can be tested: chats by calendar day of MarIA Code's last
- * reply, with running chats always under Today.
+ * DOM so the rules can be tested: chats by calendar day of their history date,
+ * with running chats always under Today.
  */
 import type { SessionListItem } from "../../src/protocol";
 
@@ -29,12 +29,12 @@ function dayStart(now: number, daysBack: number): number {
 /**
  * A running chat is current work: it goes under Today (marked by its spinner)
  * whenever MarIA Code last replied. Any other goes by the local calendar day of
- * that reply ("This week" covers the 5 days before yesterday).
+ * its history date ("This week" covers the 5 days before yesterday).
  */
 export function sectionOf(item: SessionListItem, now: number): SectionId {
-	if (item.activity === "running" || item.lastReply >= dayStart(now, 0)) return "today";
-	if (item.lastReply >= dayStart(now, 1)) return "yesterday";
-	if (item.lastReply >= dayStart(now, 6)) return "week";
+	if (item.activity === "running" || item.historyAt >= dayStart(now, 0)) return "today";
+	if (item.historyAt >= dayStart(now, 1)) return "yesterday";
+	if (item.historyAt >= dayStart(now, 6)) return "week";
 	return "older";
 }
 

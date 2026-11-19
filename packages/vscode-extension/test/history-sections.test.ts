@@ -6,6 +6,7 @@ const item = (fields: Partial<SessionListItem> = {}): SessionListItem => ({
 	path: "/s.jsonl",
 	label: "chat",
 	lastReply: 0,
+	historyAt: fields.lastReply ?? 0,
 	active: false,
 	noWorkspace: false,
 	proposals: 0,
@@ -31,6 +32,13 @@ describe("history sections", () => {
 		expect(sectionOf(item({ lastReply: at(2, 23) }), now)).toBe("week");
 		expect(sectionOf(item({ lastReply: new Date(2026, 9, 29, 0, 0).getTime() }), now)).toBe("week");
 		expect(sectionOf(item({ lastReply: new Date(2026, 9, 28, 23, 0).getTime() }), now)).toBe("older");
+	});
+
+	it("shows a branch created today in Today before it has its own reply", () => {
+		const parent = item({ lastReply: at(1, 9) });
+		const branch = item({ lastReply: parent.lastReply, historyAt: at(4, 9) });
+		expect(sectionOf(branch, now)).toBe("today");
+		expect(sectionOf(parent, now)).toBe("week");
 	});
 });
 

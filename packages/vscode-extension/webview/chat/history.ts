@@ -15,7 +15,7 @@
  * unread with a Today card's envelope, `markSessionUnread`) a green dot (a glowing
  * neon border on cards) and a bold name, the open one a blue bar (a blue border on
  * cards), and those with skill proposals a pill counting them while hovered. Ages
- * count from MarIA Code's last reply, so opening a chat does not move it.
+ * count from MarIA Code's last reply or a branch's creation if its replies were inherited.
  */
 import type { ChatRequest, SearchSource, SessionActivity, SessionListItem, SessionSearchHit } from "../../src/protocol";
 import { foldText, parseQuery, termRanges } from "../../src/search-text";
@@ -410,6 +410,34 @@ export class HistoryPanel {
 		);
 	}
 
+	#origin(item: SessionListItem): HTMLElement | null {
+		if (item.origin === undefined) return null;
+		const mark = icon("gitBranch");
+		const origin = item.origin;
+		if (!origin) {
+			const label = "Branched · original chat unavailable";
+			return h(
+				"div",
+				{ className: "history-origin", dataset: { tooltip: label } },
+				mark,
+				h("span", { className: "history-origin-label" }, label),
+			);
+		}
+		const label = `Branched from ${origin.label}`;
+		const button = h(
+			"button",
+			{ type: "button", className: "history-origin", dataset: { tooltip: `Open original chat: ${origin.label}` } },
+			mark,
+			h("span", { className: "history-origin-label" }, label),
+		);
+		button.addEventListener("click", event => {
+			event.stopPropagation();
+			this.close();
+			this.post({ type: "openSession", path: origin.path });
+		});
+		return button;
+	}
+
 	/** Row or card classes shared by both shapes: open chat, unread, being renamed. */
 	#stateClasses(base: string, item: SessionListItem, editing: boolean): string {
 		const classes = [base];
@@ -444,8 +472,9 @@ export class HistoryPanel {
 			? this.#renameInput(item)
 			: h("span", { className: "history-label" }, ...highlight(item.label, terms));
 		const [rename, remove] = this.#actions(item);
-		const age = h("span", { className: "history-age" }, compactAge(item.lastReply, now));
-		setTooltip(age, `MarIA Code's last reply: ${new Date(item.lastReply).toLocaleString()}`);
+		const age = h("span", { className: "history-age" }, compactAge(item.historyAt, now));
+		const ageLabel = item.historyAt > item.lastReply ? "Branch created" : "MarIA Code's last reply";
+		setTooltip(age, `${ageLabel}: ${new Date(item.historyAt).toLocaleString()}`);
 		const row = h(
 			"div",
 			{
@@ -464,6 +493,7 @@ export class HistoryPanel {
 				editing ? null : rename,
 				editing ? null : remove,
 			),
+			editing ? null : this.#origin(item),
 			editing ? null : this.#preview(item, terms, hit),
 		);
 		this.#wireOpen(row, item, editing);
@@ -495,10 +525,11 @@ export class HistoryPanel {
 				"div",
 				{ className: "history-card-top" },
 				this.#marker(item, false),
-				h("span", { className: "history-card-age" }, compactAge(item.lastReply, now)),
+				h("span", { className: "history-card-age" }, compactAge(item.historyAt, now)),
 				item.active ? h("span", { className: "history-card-badge" }, "Open") : null,
 			),
 			editing ? this.#renameInput(item) : h("div", { className: "history-card-title" }, item.label),
+			editing ? null : this.#origin(item),
 			last && last !== item.label
 				? h(
 						"div",
@@ -540,8 +571,10 @@ export class HistoryPanel {
 				"dl",
 				{ className: "history-card-facts" },
 				item.created === undefined ? null : fact("Started", time(item.created)),
-				fact("Last reply", time(item.lastReply)),
-				item.created === undefined ? null : fact("Ran for", durationLabel(item.created, item.lastReply)),
+				item.lastReply < item.historyAt ? null : fact("Last reply", time(item.lastReply)),
+				item.created === undefined || item.lastReply < item.historyAt
+					? null
+					: fact("Ran for", durationLabel(item.created, item.lastReply)),
 				messages ? fact("Size", messages) : null,
 			),
 			prompt("First user message", item.firstPromptFull ?? item.firstPrompt),

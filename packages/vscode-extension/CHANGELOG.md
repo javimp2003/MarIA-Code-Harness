@@ -2,9 +2,12 @@
 
 ## [Unreleased]
 
+## [0.43.0]
+
 ### Added
 
-- `/fork` starts a session from the current conversation, and each answer's **…** menu can branch into a new chat
+- Copy an assistant reply or use its **…** menu to branch into a new chat from that point. `/fork` branches the whole conversation ([#6](https://github.com/javimp2003/MarIA-Code-Harness/pull/6) by [@SergioReyesM24](https://github.com/SergioReyesM24))
+- History shows which chat a branch came from and lets you reopen the original
 
 ## [0.42.0]
 

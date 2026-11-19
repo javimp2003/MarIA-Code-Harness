@@ -14,6 +14,8 @@ import { parseQuotedPrompt } from "../quoted-prompt";
 export interface SessionSummary {
 	path: string;
 	id: string;
+	/** The parent recorded by omp, as a session file path or a session ID. */
+	parentSession?: string;
 	/** Title set by omp (auto-generated or renamed by the user). */
 	title?: string;
 	/** First line of the first user prompt. */
@@ -62,6 +64,19 @@ const MAX_TAIL_BYTES = 16 * 1024 * 1024;
 /** Display label: the title, else the first prompt, else the file name. */
 export function sessionLabel(session: SessionSummary): string {
 	return session.title || session.firstMessage || path.basename(session.path, ".jsonl");
+}
+
+/** Resolve origins only against listed chats. A missing origin still marks a chat as derived. */
+export function sessionOrigins(sessions: readonly SessionSummary[]): Map<string, SessionSummary | null> {
+	const byPath = new Map(sessions.map(session => [path.normalize(session.path), session]));
+	const byId = new Map(sessions.map(session => [session.id, session]));
+	const origins = new Map<string, SessionSummary | null>();
+	for (const session of sessions) {
+		if (!session.parentSession) continue;
+		const parent = byPath.get(path.normalize(session.parentSession)) ?? byId.get(session.parentSession);
+		origins.set(session.path, parent && parent !== session ? parent : null);
+	}
+	return origins;
 }
 
 export function relativeTime(date: Date): string {
@@ -136,6 +151,8 @@ async function readSummary(file: string): Promise<SessionSummary> {
 				if (entry.title?.trim()) summary.title = entry.title.trim();
 			} else if (entry.type === "session") {
 				if (entry.id) summary.id = entry.id;
+				if (typeof entry.parentSession === "string" && entry.parentSession)
+					summary.parentSession = entry.parentSession;
 				const created = entry.timestamp ? new Date(entry.timestamp) : undefined;
 				if (created && !Number.isNaN(created.getTime())) summary.created = created;
 			} else {
@@ -179,6 +196,7 @@ export interface SessionLine {
 	type?: string;
 	title?: string;
 	id?: string;
+	parentSession?: string;
 	timestamp?: string;
 	customType?: string;
 	attribution?: string;

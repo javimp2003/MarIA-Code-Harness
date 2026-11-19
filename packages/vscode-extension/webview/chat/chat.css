@@ -2594,6 +2594,51 @@ code {
 	text-overflow: ellipsis;
 }
 
+.history-origin {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	width: fit-content;
+	max-width: 100%;
+	min-width: 0;
+	padding: 0;
+	border: 0;
+	background: transparent;
+	color: var(--c-fg-3);
+	font: inherit;
+	font-size: var(--fs-sm);
+	text-align: left;
+}
+
+.history-origin .icon {
+	flex: none;
+	width: 12px;
+	height: 12px;
+}
+
+button.history-origin {
+	color: var(--vscode-textLink-foreground, var(--c-fg-2));
+	cursor: pointer;
+}
+
+button.history-origin:hover .history-origin-label,
+button.history-origin:focus-visible .history-origin-label {
+	text-decoration: underline;
+}
+
+.history-origin-label {
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.history-row .history-origin {
+	margin-left: 20px;
+	max-width: calc(100% - 20px);
+}
+
 .history-match {
 	background: var(
 		--vscode-editor-findMatchHighlightBackground,
@@ -2976,6 +3021,10 @@ code {
 	-webkit-line-clamp: 5;
 	-webkit-box-orient: vertical;
 	overflow: hidden;
+}
+
+.history-card-front:has(.history-origin) .history-card-preview-text {
+	-webkit-line-clamp: 3;
 }
 
 /* Tall enough, with the face's padding, to keep the line above clear of the delete corner. */

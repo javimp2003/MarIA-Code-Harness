@@ -17,7 +17,7 @@ import type { AgentStatus, ChatRequest, ChatUpdate, ModelChoice } from "../proto
 import { OmpCommandError, type OmpParams, type OmpProcess } from "../rpc/omp-process";
 import { renameStoredSession } from "../sessions/rename";
 import { sessionSearch } from "../sessions/session-search";
-import { guessSessionDir, listSessions, sessionLabel } from "../sessions/session-store";
+import { guessSessionDir, listSessions, sessionLabel, sessionOrigins } from "../sessions/session-store";
 import { isNoWorkspaceSession, noWorkspaceFolder, noWorkspaceSessionDir } from "../no-workspace";
 import { runOmp } from "../settings/settings-panel";
 import type { SkillProposalStore } from "../skills/proposals";
@@ -476,25 +476,36 @@ export class ChatSession implements vscode.Disposable, HostView {
 		);
 		const activity = this.pool.activities();
 		const proposals = this.#proposalCounts();
+		const origins = sessionOrigins(groups.flatMap(group => group.sessions));
 		this.post({
 			type: "sessions",
 			sessions: groups.flatMap(({ noWorkspace, sessions }) =>
-				sessions.map(session => ({
-					path: session.path,
-					label: sessionLabel(session),
-					firstPrompt: session.firstMessage,
-					lastPrompt: session.singlePrompt ? undefined : session.lastMessage,
-					firstPromptFull: session.firstMessageFull,
-					lastPromptFull: session.singlePrompt ? undefined : session.lastMessageFull,
-					lastReply: session.lastReply.getTime(),
-					created: session.created?.getTime(),
-					messages: session.messageCount,
-					messagesPartial: session.truncated,
-					active: session.path === current,
-					activity: activity[session.path],
-					noWorkspace,
-					proposals: proposals[session.path] ?? 0,
-				})),
+				sessions
+					.map(session => {
+						const parent = origins.get(session.path);
+						const lastReply = session.lastReply.getTime();
+						const created = session.created?.getTime();
+						return {
+							path: session.path,
+							label: sessionLabel(session),
+							origin: parent ? { path: parent.path, label: sessionLabel(parent) } : parent,
+							firstPrompt: session.firstMessage,
+							lastPrompt: session.singlePrompt ? undefined : session.lastMessage,
+							firstPromptFull: session.firstMessageFull,
+							lastPromptFull: session.singlePrompt ? undefined : session.lastMessageFull,
+							lastReply,
+							historyAt:
+								session.parentSession && created !== undefined ? Math.max(lastReply, created) : lastReply,
+							created,
+							messages: session.messageCount,
+							messagesPartial: session.truncated,
+							active: session.path === current,
+							activity: activity[session.path],
+							noWorkspace,
+							proposals: proposals[session.path] ?? 0,
+						};
+					})
+					.sort((a, b) => b.historyAt - a.historyAt),
 			),
 		});
 	}
