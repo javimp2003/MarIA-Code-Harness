@@ -798,6 +798,76 @@ code {
 	gap: 6px;
 }
 
+.assistant-actions {
+	display: flex;
+	align-items: center;
+	gap: 2px;
+	padding-left: 20px;
+}
+
+.assistant-actions .icon {
+	width: 14px;
+	height: 14px;
+}
+
+.assistant-overflow {
+	position: relative;
+}
+
+.assistant-overflow > summary {
+	display: inline-flex;
+	list-style: none;
+	cursor: pointer;
+}
+
+.assistant-overflow > summary::-webkit-details-marker {
+	display: none;
+}
+
+.assistant-overflow:not([open]) > .assistant-action-menu {
+	display: none;
+}
+
+.assistant-action-menu {
+	position: absolute;
+	left: 0;
+	bottom: calc(100% + 6px);
+	z-index: 30;
+	display: flex;
+	padding: 4px;
+	border: 1px solid var(--c-border-heavy);
+	border-radius: 9999px;
+	background: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+	box-shadow: var(--menu-shadow);
+}
+
+.assistant-menu-item {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 5px 10px;
+	border: 0;
+	border-radius: 9999px;
+	background: transparent;
+	color: var(--c-fg-2);
+	font: inherit;
+	font-size: var(--fs-sm);
+	white-space: nowrap;
+	cursor: pointer;
+}
+
+.assistant-menu-item:hover,
+.assistant-menu-item:focus-visible {
+	background: var(--c-hover);
+	color: var(--c-fg);
+	outline: none;
+}
+
+.assistant-menu-item .icon {
+	width: 14px;
+	height: 14px;
+}
+
 /*
  * Each tool round trip is its own assistant message (thinking + call, then
  * thinking + answer). Back to back, they read as one turn: close the 14px gap

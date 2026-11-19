@@ -12,10 +12,11 @@ import { Composer, type ComposerState } from "./composer";
 import { Header } from "./header";
 import { HistoryPanel } from "./history";
 import { FindBar } from "./find";
+import { chatLocalCommands } from "./local-commands";
 import { installLinkContextMenu } from "./link-menu";
 import { PlanFeedbackDialog } from "./plan-feedback";
 import { setLongTextLimits } from "./long-text";
-import { Transcript, brailleSpinner } from "./transcript";
+import { installAssistantActionMenus, Transcript, brailleSpinner } from "./transcript";
 
 type ChatViewState = Partial<ComposerState>;
 
@@ -47,18 +48,9 @@ const composer = new Composer(
 	state => vscode.setState(state),
 	{ draft: saved?.draft ?? "", quote: saved?.quote, mentions: saved?.mentions },
 	{
-		// TUI commands without an RPC handler, run by the chat itself.
-		localCommands: [
-			{ name: "new", description: "Start a new session", run: () => post({ type: "newSession" }) },
-			{
-				name: "resume",
-				description: "Resume a different session",
-				run: () => {
-					if (!history.isOpen) history.toggle();
-				},
-			},
-			{ name: "settings", description: "Open settings", run: () => post({ type: "openSettings" }) },
-		],
+		localCommands: chatLocalCommands(post, () => {
+			if (!history.isOpen) history.toggle();
+		}),
 		onToggleThinking: expanded => transcript.setThinkingExpanded(expanded),
 		promptHistory: () => transcript.recentPrompts(),
 	},
@@ -89,6 +81,7 @@ const root = document.getElementById("root")!;
 root.classList.add("chat");
 installTooltips();
 installLinkContextMenu();
+installAssistantActionMenus();
 const main = h("div", { className: "main" }, transcript.element, find.element, statusPanel, history.element);
 // Questions from omp cover this chat (transcript and composer), not the header with the History and new chats.
 const askDialog = new AskDialog(post, () => composer.cancelDictation(), [main, composer.element]);

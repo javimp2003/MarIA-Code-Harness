@@ -1,5 +1,11 @@
 # Changelog
 
+## [Unreleased]
+
+### Added
+
+- `/fork` starts a session from the current conversation, and each answer's **…** menu can branch into a new chat
+
 ## [0.42.0]
 
 ### Added

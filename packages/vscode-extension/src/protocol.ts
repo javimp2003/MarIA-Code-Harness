@@ -394,6 +394,10 @@ export type ChatRequest =
 	 * prompts (`isUserPrompt`) after it (0 = the last one); `original` is its text as shown.
 	 */
 	| { type: "editMessage"; fromEnd: number; original: string; text: string }
+	/** Fork the current transcript into a new session. */
+	| { type: "forkSession" }
+	/** Open a new chat forked from an assistant message. */
+	| { type: "branchMessage"; timestamp: number }
 	| { type: "abort" }
 	/** Start a new chat; `noWorkspace` starts one without a workspace (see no-workspace.ts). */
 	| { type: "newSession"; noWorkspace?: boolean }

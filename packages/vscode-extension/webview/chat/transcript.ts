@@ -95,13 +95,79 @@ function turnFooter(ms: number): HTMLElement {
  * whose icon turns into a check after copying.
  */
 function messageActions(text: string, onEdit?: () => void): HTMLElement {
+	return h(
+		"div",
+		{ className: "msg-actions" },
+		onEdit && iconButton("pencil", "Edit message", onEdit),
+		copyButton(text),
+	);
+}
+
+function copyButton(text: string): HTMLButtonElement {
 	const copy = iconButton("copy", "Copy message", () => {
 		void navigator.clipboard.writeText(text).then(() => {
 			copy.replaceChildren(icon("check"));
 			setTimeout(() => copy.replaceChildren(icon("copy")), 1200);
 		});
 	});
-	return h("div", { className: "msg-actions" }, onEdit && iconButton("pencil", "Edit message", onEdit), copy);
+	return copy;
+}
+
+function assistantActions(text: string, timestamp: number, onBranch: (timestamp: number) => void): HTMLDivElement {
+	const overflow = h("details", { className: "assistant-overflow" });
+	const toggle = h(
+		"summary",
+		{
+			className: "icon-button",
+			ariaLabel: "More actions",
+			ariaHasPopup: "menu",
+			ariaExpanded: "false",
+			dataset: { tooltip: "More actions" },
+		},
+		icon("ellipsis"),
+	);
+	const branch = button("Branch in new chat", "assistant-menu-item", () => {
+		overflow.open = false;
+		onBranch(timestamp);
+	});
+	branch.role = "menuitem";
+	branch.prepend(icon("gitBranch"));
+	const menu = h("div", { className: "assistant-action-menu", role: "menu", ariaLabel: "Message actions" }, branch);
+	overflow.append(toggle, menu);
+	overflow.addEventListener("toggle", () => {
+		toggle.ariaExpanded = String(overflow.open);
+		if (!overflow.open) return;
+
+		const margin = 8;
+		const menuBounds = menu.getBoundingClientRect();
+		const toggleBounds = toggle.getBoundingClientRect();
+		const ownerBounds = overflow.getBoundingClientRect();
+		const maxLeft = Math.max(margin, window.innerWidth - menuBounds.width - margin);
+		const left = Math.min(Math.max(toggleBounds.left, margin), maxLeft);
+		menu.style.left = `${left - ownerBounds.left}px`;
+	});
+	overflow.addEventListener("keydown", event => {
+		if (event.key !== "Escape") return;
+		event.preventDefault();
+		overflow.open = false;
+		toggle.focus();
+	});
+	return h("div", { className: "assistant-actions" }, copyButton(text), overflow);
+}
+
+/** Close a message menu when the user clicks elsewhere in the webview. */
+export function installAssistantActionMenus(): void {
+	document.addEventListener(
+		"pointerdown",
+		event => {
+			const target = event.target;
+			if (!(target instanceof Node)) return;
+			for (const menu of document.querySelectorAll<HTMLDetailsElement>(".assistant-overflow[open]")) {
+				if (!menu.contains(target)) menu.open = false;
+			}
+		},
+		true,
+	);
 }
 
 function contentText(content: string | Array<{ type: string; text?: string }>): string {
@@ -249,14 +315,16 @@ class AssistantView {
 	readonly element = h("div", { className: "msg assistant" });
 	#slots: Slot[] = [];
 	#footer = h("div", { className: "msg-footer" });
+	#actions = h("div", { className: "assistant-actions" });
 
 	constructor(
 		private readonly key: string,
 		private readonly card: (id: string) => ToolCard,
 		/** The composer's "expand all thinking" toggle is on. */
 		private readonly thinkingExpanded: () => boolean,
+		private readonly onBranchMessage: (timestamp: number) => void,
 	) {
-		this.element.append(this.#footer);
+		this.element.append(this.#footer, this.#actions);
 	}
 
 	update(message: AssistantMessage, streaming: boolean): void {
@@ -317,6 +385,12 @@ class AssistantView {
 			this.#footer.append(h("div", { className: "error-block" }, message.errorMessage || "The request failed."));
 		} else if (message.stopReason === "aborted") {
 			this.#footer.append(h("div", { className: "note" }, "Interrupted"));
+		}
+		this.#actions.replaceChildren();
+		if (!streaming && (message.stopReason === "stop" || message.stopReason === "length")) {
+			const actions = assistantActions(contentText(message.content ?? []), message.timestamp, this.onBranchMessage);
+			this.#actions.replaceWith(actions);
+			this.#actions = actions;
 		}
 	}
 
@@ -584,6 +658,7 @@ export class Transcript {
 					`h${this.#list.childElementCount}`,
 					id => this.#card(id),
 					() => this.#thinkingExpanded,
+					timestamp => this.post({ type: "branchMessage", timestamp }),
 				);
 				view.update(message, false);
 				this.#list.append(view.element);
@@ -802,6 +877,7 @@ export class Transcript {
 					key,
 					id => this.#card(id),
 					() => this.#thinkingExpanded,
+					timestamp => this.post({ type: "branchMessage", timestamp }),
 				);
 				this.#live.set(key, view);
 				this.#list.append(view.element);

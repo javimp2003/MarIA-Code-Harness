@@ -14,6 +14,7 @@ export type IconName =
 	| "chevronRight"
 	| "back"
 	| "copy"
+	| "ellipsis"
 	| "check"
 	| "search"
 	| "terminal"
@@ -36,6 +37,7 @@ export type IconName =
 	| "bash"
 	| "plusGlobe"
 	| "copyPlus"
+	| "gitBranch"
 	| "reply"
 	| "askBubble"
 	| "zap"
@@ -68,6 +70,7 @@ const PATHS: Record<IconName, string> = {
 	chevronRight: "m9 18 6-6-6-6",
 	back: "M19 12H5M12 19l-7-7 7-7",
 	copy: "M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2zM4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2",
+	ellipsis: "M5 12h.01M12 12h.01M19 12h.01",
 	check: "M20 6 9 17l-5-5",
 	search: "M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0zM21 21l-4.3-4.3",
 	terminal: "m4 17 6-6-6-6M12 19h8",
@@ -98,6 +101,8 @@ const PATHS: Record<IconName, string> = {
 	// Two stacked squares with a plus (Lucide "copy-plus"): a new chat in another tab.
 	copyPlus:
 		"M15 12v6M12 15h6M10 8h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V10a2 2 0 0 1 2-2zM4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2",
+	gitBranch:
+		"M21 18a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM9 6a3 3 0 1 1-6 0 3 3 0 0 1 6 0ZM6 9v12M15 6a3 3 0 0 0-3 3v3a3 3 0 0 1-3 3H6",
 	reply: "m9 17-5-5 5-5M20 18v-2a4 4 0 0 0-4-4H4",
 	// A speech bubble with a question mark (Lucide "message-circle-question"): "Ask something" about a selection.
 	askBubble: "M7.9 20A9 9 0 1 0 4 16.1L2 22ZM9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01",

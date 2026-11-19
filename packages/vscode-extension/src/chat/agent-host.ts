@@ -49,6 +49,7 @@ import { AsyncJobRoster } from "./async-job-roster";
 import { PlanRunTracker } from "./plan-run";
 import { TodoListTracker } from "./todo-list";
 import { userPrompt } from "./prompt-entries";
+import { assistantEntryIdAt } from "./assistant-entry";
 import { SubagentRequestLog } from "./subagent-requests";
 import { SubagentRoster } from "./subagent-roster";
 import { importSkills } from "../skills/import-skills";
@@ -123,7 +124,12 @@ const DICTATION_STOP_TIMEOUT_MS = 120_000;
 const PREDICT_TIMEOUT_MS = 155_000;
 
 /** What a new process should open. */
-export type SessionTarget = { kind: "continue" } | { kind: "new" } | { kind: "resume"; sessionFile: string };
+export type ForkTarget = { kind: "fork"; sessionFile: string; entryId: string };
+export type SessionTarget =
+	| { kind: "continue" }
+	| { kind: "new" }
+	| { kind: "resume"; sessionFile: string }
+	| ForkTarget;
 
 /** A turn's file checkpoint while it runs. */
 interface TurnCheckpoint {
@@ -391,7 +397,7 @@ export class AgentHost implements vscode.Disposable {
 		const args = [...readConfig().extraArgs];
 		// Chats without a workspace keep the general prompt: no coding guidance or workspace snapshot.
 		if (this.noWorkspace) args.push("--no-coding-guidance");
-		if (target.kind === "resume") args.push("--resume", target.sessionFile);
+		if (target.kind === "resume" || target.kind === "fork") args.push("--resume", target.sessionFile);
 		else if (target.kind === "continue") args.push("--continue");
 		this.log.appendLine(
 			`[start] ${process.command.executable} ${[...process.command.args, ...args].join(" ")} (cwd ${cwd})`,
@@ -407,6 +413,17 @@ export class AgentHost implements vscode.Disposable {
 		await process
 			.request("set_subagent_subscription", { level: "progress" })
 			.catch(error => this.log.appendLine(String(error)));
+		if (target.kind === "fork") {
+			try {
+				const result = await process.request("fork", { entryId: target.entryId });
+				if (result.cancelled) throw new Error("No se pudo crear la rama de esta conversación.");
+			} catch (error) {
+				const message = errorMessage(error);
+				await this.#stopProcess();
+				this.#setStatus({ phase: "stopped", message });
+				return;
+			}
+		}
 		this.#setStatus({ phase: "ready" });
 		this.#title = undefined;
 		this.#setCuration(CURATION_IDLE);
@@ -432,12 +449,7 @@ export class AgentHost implements vscode.Disposable {
 		const process = this.#requireProcess();
 		const result = await process.request("new_session", {});
 		if (result.cancelled) return;
-		this.#title = undefined;
-		this.#setCuration(CURATION_IDLE);
-		this.#resetSubagents();
-		this.#resetJobs();
-		await this.#sendSnapshot(process, this.#views);
-		void this.#refreshJobs();
+		await this.#afterSessionChange(process);
 	}
 
 	/** Open another session in this process. Aborts a running turn: callers only use it when idle. */
@@ -449,6 +461,30 @@ export class AgentHost implements vscode.Disposable {
 		}
 		const result = await process.request("switch_session", { sessionPath: sessionFile });
 		if (result.cancelled) return;
+		await this.#afterSessionChange(process);
+	}
+
+	/** Fork the current transcript into a new session in the same process. */
+	async fork(): Promise<boolean> {
+		const process = this.#requireProcess();
+		const result = await process.request("fork", {});
+		if (result.cancelled) return false;
+		await this.#afterSessionChange(process);
+		return true;
+	}
+
+	async forkTarget(timestamp: number): Promise<ForkTarget> {
+		const process = this.#requireProcess();
+		if (this.#busy || !this.#settled) throw new Error("Espera a que termine la respuesta antes de crear una rama.");
+		const sessionFile = this.sessionFile;
+		if (!sessionFile) throw new Error("Esta conversación todavía no tiene una sesión guardada.");
+		const { entries } = await process.request("get_entries", {});
+		const entryId = assistantEntryIdAt(entries, timestamp);
+		if (!entryId) throw new Error("No se encontró ese mensaje en la conversación.");
+		return { kind: "fork", sessionFile, entryId };
+	}
+
+	async #afterSessionChange(process: OmpProcess): Promise<void> {
 		this.#title = undefined;
 		this.#resetSubagents();
 		this.#resetJobs();

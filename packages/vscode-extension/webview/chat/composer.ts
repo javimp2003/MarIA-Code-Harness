@@ -43,20 +43,10 @@ import { TodoPanel } from "./todo-panel";
 import type { PromptRecall } from "./transcript";
 import { SkillsPanel } from "./skills-panel";
 import { SubagentPanel } from "./subagent-panel";
+import type { LocalCommand } from "./local-commands";
 
 type Post = (request: ChatRequest) => void;
 type NoticeLevel = "info" | "warning" | "error";
-
-/**
- * A slash command the webview runs itself: TUI commands omp's RPC mode does
- * not offer (`/new`, `/resume`, `/settings`, `/plan`) mapped onto the chat's own UI.
- */
-export interface LocalCommand {
-	name: string;
-	description: string;
-	/** `args` is the text after the command name, trimmed. */
-	run(args: string): void;
-}
 
 export interface ComposerOptions {
 	localCommands: LocalCommand[];

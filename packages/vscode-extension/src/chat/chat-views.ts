@@ -70,6 +70,9 @@ export class ChatRegistry implements vscode.WebviewViewProvider, vscode.Disposab
 			openInNewTab: noWorkspace => {
 				this.openPanel({ kind: "new" }, noWorkspace, vscode.ViewColumn.Active);
 			},
+			openForkInNewTab: (target, noWorkspace) => {
+				this.openPanel(target, noWorkspace, vscode.ViewColumn.Active);
+			},
 		});
 		this.#sidebar = session;
 		view.onDidChangeVisibility(() => {
@@ -113,6 +116,9 @@ export class ChatRegistry implements vscode.WebviewViewProvider, vscode.Disposab
 			// Another tab in this tab's editor group.
 			openInNewTab: noWorkspace => {
 				this.openPanel({ kind: "new" }, noWorkspace, panel.viewColumn ?? vscode.ViewColumn.Active);
+			},
+			openForkInNewTab: (target, noWorkspace) => {
+				this.openPanel(target, noWorkspace, panel.viewColumn ?? vscode.ViewColumn.Active);
 			},
 		});
 		this.#panels.add(session);
