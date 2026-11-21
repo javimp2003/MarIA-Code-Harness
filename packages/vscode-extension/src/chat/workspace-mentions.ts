@@ -33,14 +33,24 @@ export function formatWorkspaceMention(relative: string): string | undefined {
 		: `@${relative}`;
 }
 
-/** Entries whose shown path contains `query`, names starting with it first; same-named files in different folders all stay. */
+/**
+ * Entries whose shown path contains `query`: names starting with it first, then the shallowest, folders before
+ * files at the same depth (a bare `@` lists the project's top level instead of the first deep files by path).
+ * Same-named files in different folders all stay.
+ */
 export function rankWorkspaceMentions(entries: readonly WorkspaceMention[], query: string): WorkspaceMention[] {
 	const needle = query.toLowerCase();
 	const unique = new Map(entries.map(entry => [entry.mention, entry]));
 	const matches = [...unique.values()].filter(entry => entry.path.toLowerCase().includes(needle));
+	const depth = (entry: WorkspaceMention) => entry.path.split("/").length;
 	matches.sort((a, b) => {
 		const prefix = Number(b.name.toLowerCase().startsWith(needle)) - Number(a.name.toLowerCase().startsWith(needle));
-		return prefix || a.path.localeCompare(b.path);
+		return (
+			prefix ||
+			depth(a) - depth(b) ||
+			Number(b.kind === "folder") - Number(a.kind === "folder") ||
+			a.path.localeCompare(b.path)
+		);
 	});
 	return matches.slice(0, MAX_MENTION_RESULTS);
 }

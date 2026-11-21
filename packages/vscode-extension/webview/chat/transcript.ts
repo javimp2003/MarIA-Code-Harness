@@ -25,7 +25,7 @@ import { ExamplePrompts } from "./example-prompts";
 import { openLightbox } from "./lightbox";
 import { countLines, isLongText } from "./long-text";
 import { playFarewell, preloadFarewell } from "./logo-farewell";
-import { renderMarkdown } from "./markdown";
+import { markdownClipboard, renderMarkdown } from "./markdown";
 import { MessageEditor } from "./message-editor";
 import { splitMentions } from "./mention-token";
 import { SelectionReply } from "./selection-reply";
@@ -99,13 +99,24 @@ function messageActions(text: string, onEdit?: () => void): HTMLElement {
 		"div",
 		{ className: "msg-actions" },
 		onEdit && iconButton("pencil", "Edit message", onEdit),
-		copyButton(text),
+		copyButton(() => navigator.clipboard.writeText(text)),
 	);
 }
 
-function copyButton(text: string): HTMLButtonElement {
+/** An assistant reply on the clipboard as rich text, with plain text free of markdown markers for targets that take none. */
+function copyMarkdown(source: string): Promise<void> {
+	const { html, text } = markdownClipboard(source);
+	return navigator.clipboard.write([
+		new ClipboardItem({
+			"text/html": new Blob([html], { type: "text/html" }),
+			"text/plain": new Blob([text], { type: "text/plain" }),
+		}),
+	]);
+}
+
+function copyButton(write: () => Promise<void>): HTMLButtonElement {
 	const copy = iconButton("copy", "Copy message", () => {
-		void navigator.clipboard.writeText(text).then(() => {
+		void write().then(() => {
 			copy.replaceChildren(icon("check"));
 			setTimeout(() => copy.replaceChildren(icon("copy")), 1200);
 		});
@@ -152,7 +163,12 @@ function assistantActions(text: string, timestamp: number, onBranch: (timestamp:
 		overflow.open = false;
 		toggle.focus();
 	});
-	return h("div", { className: "assistant-actions" }, copyButton(text), overflow);
+	return h(
+		"div",
+		{ className: "assistant-actions" },
+		copyButton(() => copyMarkdown(text)),
+		overflow,
+	);
 }
 
 /** Close a message menu when the user clicks elsewhere in the webview. */

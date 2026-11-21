@@ -1138,7 +1138,7 @@ export class Composer {
 					"div",
 					{ className: "slash-item", role: "option", ariaSelected: String(index === this.#selected) },
 					icon(entry.kind === "folder" ? "folder" : "file"),
-					h("span", { className: "slash-name" }, entry.name),
+					h("span", { className: "slash-name" }, entry.kind === "folder" ? `${entry.name}/` : entry.name),
 					// The folder it is in; the name is already shown.
 					h(
 						"span",

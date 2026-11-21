@@ -18,8 +18,10 @@ import {
 } from "./activity";
 import { askSummary, askSummaryView } from "./ask-summary";
 import { fileLink, thumbnail } from "./content";
+import { type DiffRow, changePreview, isChangeTool } from "./diff-rows";
 
 const MAX_LINES = 200;
+const PREVIEW_ROWS = 30;
 const FAMILY_ICONS: Record<ToolFamily, IconName> = {
 	run: "bash",
 	code: "python",
@@ -32,9 +34,6 @@ const FAMILY_ICONS: Record<ToolFamily, IconName> = {
 	ask: "messageQuestion",
 	other: "wrench",
 };
-
-/** File tools whose finished rows offer "See changes". */
-const CHANGE_TOOLS: Record<string, true> = { edit: true, write: true, notebook: true, ast_edit: true };
 
 /** File subjects open in the editor; web URLs open in the browser (the transcript handles `data-href`). */
 function subjectContent(subject: ActivitySubject): Node | string {
@@ -102,11 +101,48 @@ export function diffLineClass(line: string): string | undefined {
 	return undefined;
 }
 
+function previewRow(row: DiffRow): HTMLElement {
+	if (row.kind === "gap") {
+		return h(
+			"div",
+			{ className: "diff-row diff-gap" },
+			h("span", { className: "diff-num" }),
+			h("span", { className: "diff-code" }, "⋯"),
+		);
+	}
+	const mark = row.kind === "add" ? "+" : row.kind === "del" ? "−" : " ";
+	return h(
+		"div",
+		{ className: `diff-row diff-row-${row.kind}` },
+		h("span", { className: "diff-num" }, row.line === undefined ? "" : String(row.line)),
+		h("span", { className: "diff-mark", ariaHidden: "true" }, mark),
+		h("span", { className: "diff-code" }, row.text),
+	);
+}
+
+/** Added/removed lines on coloured backgrounds with a line-number gutter; the first `PREVIEW_ROWS` rows, then a button for the rest. */
+function diffPreview(rows: DiffRow[]): HTMLElement {
+	const lines = h("div", { className: "diff-rows" });
+	const fill = (count: number) => lines.replaceChildren(...rows.slice(0, count).map(previewRow));
+	fill(PREVIEW_ROWS);
+	const box = h("div", { className: "diff-preview" }, h("div", { className: "diff-scroll" }, lines));
+	if (rows.length > PREVIEW_ROWS) {
+		const more = button(`Show ${rows.length - PREVIEW_ROWS} more lines`, "link-button show-more", () => {
+			fill(rows.length);
+			more.remove();
+		});
+		box.append(more);
+	}
+	return box;
+}
+
 export class ToolCard {
 	readonly element: HTMLDetailsElement;
 	#row = h("summary", { className: "activity-row" });
 	#args = h("div", { className: "activity-args" });
 	#result = h("div", { className: "activity-result" });
+	#preview = h("div", { className: "activity-preview" });
+	#hasPreview = false;
 	#argsKey = "";
 	#resultKey = "";
 	#name = "";
@@ -125,6 +161,7 @@ export class ToolCard {
 			"details",
 			{ className: "activity" },
 			this.#row,
+			this.#preview,
 			h("div", { className: "activity-body" }, this.#args, this.#result),
 		);
 		this.setStatus("pending");
@@ -140,6 +177,7 @@ export class ToolCard {
 		this.#purpose = intent ?? str(args.i);
 		this.#renderArgs();
 		this.#renderRow();
+		this.#renderPreview();
 	}
 
 	#renderArgs(): void {
@@ -170,6 +208,7 @@ export class ToolCard {
 		if (this.element.dataset.status === status) return;
 		this.element.dataset.status = status;
 		this.#renderRow();
+		this.#renderPreview();
 	}
 
 	get status(): ToolStatus {
@@ -186,13 +225,22 @@ export class ToolCard {
 		this.#details = result && typeof result === "object" && "details" in result ? result.details : undefined;
 		const ask = this.#name.toLowerCase() === "ask";
 		if (ask) this.#renderArgs();
+		this.#renderPreview();
 		const children: Node[] = [];
-		if (parts.diff) children.push(truncatedPre(parts.diff, "activity-pre diff", diffLineClass));
+		if (parts.diff && !this.#hasPreview) children.push(truncatedPre(parts.diff, "activity-pre diff", diffLineClass));
 		// Answered questions show in the summary; the raw text stays for what has none (a dismissal, an error).
 		if (parts.text && !(ask && this.#details)) children.push(truncatedPre(parts.text, "activity-pre"));
 		for (const image of parts.images) children.push(thumbnail(image));
 		this.#result.replaceChildren(...children);
 		this.#renderRow();
+	}
+
+	/** The change a finished edit or write call shows under its row, whether the card is open or not. */
+	#renderPreview(): void {
+		const rows = changePreview(this.#name, this.#callArgs, this.#details, this.status);
+		this.#hasPreview = rows !== undefined;
+		this.element.classList.toggle("has-preview", this.#hasPreview);
+		this.#preview.replaceChildren(...(rows ? [diffPreview(rows)] : []));
 	}
 
 	#renderRow(): void {
@@ -230,7 +278,7 @@ export class ToolCard {
 		}
 		if (status === "error") children.push(h("span", { className: "activity-state error" }, "Failed"));
 		else if (status === "interrupted") children.push(h("span", { className: "activity-state" }, "Stopped"));
-		if (this.toolCallId && status === "done" && CHANGE_TOOLS[(this.#name || "").toLowerCase()] && subject?.path) {
+		if (this.toolCallId && status === "done" && isChangeTool(this.#name) && subject?.path) {
 			const changes = h(
 				"button",
 				{

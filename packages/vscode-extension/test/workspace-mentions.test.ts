@@ -45,4 +45,25 @@ describe("workspace mentions", () => {
 			"first/src/component-other.ts",
 		]);
 	});
+
+	test("lists the top level, folders first, before deeper files", () => {
+		const folder = (shown: string): WorkspaceMention => ({
+			...entry(shown.split("/").pop()!, shown, `@${shown}`),
+			kind: "folder",
+		});
+		const entries = [
+			entry("a.ts", ".github/workflows/a.ts", "@.github/workflows/a.ts"),
+			entry("README.md", "README.md", "@README.md"),
+			folder("packages/ai"),
+			folder("packages"),
+			folder("docs"),
+		];
+		expect(rankWorkspaceMentions(entries, "").map(item => item.path)).toEqual([
+			"docs",
+			"packages",
+			"README.md",
+			"packages/ai",
+			".github/workflows/a.ts",
+		]);
+	});
 });

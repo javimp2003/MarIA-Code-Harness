@@ -1515,6 +1515,92 @@ code {
 	gap: 6px;
 }
 
+/* The change of an edit or write call, shown under its row whether the card is open or not (webview/chat/diff-rows.ts). */
+.activity-preview:empty {
+	display: none;
+}
+
+.activity.has-preview::details-content {
+	content-visibility: visible;
+}
+
+.activity.has-preview:not([open]) > .activity-body {
+	display: none;
+}
+
+.diff-preview {
+	margin: 4px 0 6px 22px;
+	border: 1px solid var(--c-border);
+	border-radius: var(--r-lg);
+	background: var(--c-surface);
+	overflow: hidden;
+}
+
+.diff-scroll {
+	max-height: 60vh;
+	overflow: auto;
+}
+
+.diff-rows {
+	width: max-content;
+	min-width: 100%;
+	padding: 4px 0;
+	font-family: var(--vscode-editor-font-family, monospace);
+	font-size: var(--fs-code);
+	line-height: 1.5;
+	tab-size: 4;
+}
+
+.diff-row {
+	display: flex;
+	min-height: 1.5em;
+}
+
+.diff-row-add {
+	background: color-mix(in srgb, var(--c-add) 16%, transparent);
+}
+
+.diff-row-del {
+	background: color-mix(in srgb, var(--c-del) 16%, transparent);
+}
+
+.diff-num {
+	flex: none;
+	min-width: 5ch;
+	padding: 0 8px;
+	text-align: right;
+	color: var(--c-fg-3);
+	user-select: none;
+}
+
+.diff-mark {
+	flex: none;
+	width: 2ch;
+	user-select: none;
+}
+
+.diff-row-add .diff-mark {
+	color: var(--c-add);
+}
+
+.diff-row-del .diff-mark {
+	color: var(--c-del);
+}
+
+.diff-code {
+	white-space: pre;
+	padding-right: 12px;
+}
+
+.diff-gap {
+	color: var(--c-fg-3);
+}
+
+.diff-preview > .show-more {
+	margin: 0;
+	padding: 4px 10px 6px;
+}
+
 .activity-intent {
 	font-size: var(--fs-sm);
 	color: var(--c-fg-3);
@@ -6882,4 +6968,8 @@ body.vscode-high-contrast-light .picker-trigger .icon.picker-gateway {
 	width: 14px;
 	height: 14px;
 	color: var(--c-fg-2);
+}
+
+.slash-item > .icon-folder {
+	color: var(--omp-accent);
 }

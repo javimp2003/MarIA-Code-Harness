@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.44.0]
+
+### Added
+
+- Edits, writes and deletes show a preview of the change right in the chat, without expanding the row: removed lines in red, added lines in green and a line-number gutter; long changes show the first 30 lines and "Show more lines"
+
+### Changed
+
+- The `@` popup lists folders before files and the shallowest first, so a bare `@` shows the project's top-level folders and files instead of the first deep files; folders show a green icon and a trailing `/`
+
+### Fixed
+
+- The copy button under a reply pastes formatted text (bold, lists, links, code) into editors that take it, and plain text without markdown markers (`**`, backticks, `#`) elsewhere, instead of the raw markdown
+
 ## [0.43.0]
 
 ### Added
