@@ -271,6 +271,12 @@ export class ChatSession implements vscode.Disposable, HostView {
 		await this.open({ kind: "new" }, noWorkspace);
 	}
 
+	/** A new session that starts by running `prompt`. */
+	async startPrompt(prompt: string): Promise<void> {
+		await this.newSession();
+		await this.#requireHost().prompt(prompt, undefined);
+	}
+
 	async restart(): Promise<void> {
 		await this.#requireHost().restart();
 	}

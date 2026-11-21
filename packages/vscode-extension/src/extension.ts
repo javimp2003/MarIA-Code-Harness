@@ -18,6 +18,11 @@ import type { SkillProposalSummary } from "./protocol";
 import { SkillProposalStore } from "./skills/proposals";
 import { type HistoryEntry, SkillsTree, type SkillsNode } from "./skills/skills-tree";
 import { initSounds } from "./sounds";
+import { type ReleaseInfo, findNewerRelease } from "./update-check";
+import { updatePrompt } from "./update-prompt";
+
+/** Button of the popup announcing a newer release. */
+const SELF_UPDATE_ACTION = "Dile a MarIA Code que se autoactualice";
 
 export function activate(context: vscode.ExtensionContext): void {
 	initSounds(context.extensionUri);
@@ -266,6 +271,36 @@ export function activate(context: vscode.ExtensionContext): void {
 			}
 		};
 
+	/** Announce a newer release and, when asked, start a chat in which MarIA Code updates itself. */
+	const offerUpdate = async () => {
+		const installedVersion = String(context.extension.packageJSON.version);
+		let release: ReleaseInfo | undefined;
+		try {
+			release = await findNewerRelease(installedVersion);
+		} catch (error) {
+			// Offline, or a proxy that blocks GitHub: not worth a popup at every start.
+			log.appendLine(`[update] could not look for a newer release: ${errorMessage(error)}`);
+			return;
+		}
+		if (!release) return;
+		const choice = await vscode.window.showInformationMessage(
+			`MarIA Code ${release.extensionVersion} ya está disponible; tienes la ${installedVersion}.`,
+			SELF_UPDATE_ACTION,
+		);
+		if (choice !== SELF_UPDATE_ACTION) return;
+		const prompt = updatePrompt(release, {
+			installedVersion,
+			platform: process.platform,
+			arch: process.arch,
+			appName: vscode.env.appName,
+			codeCli: path.join(vscode.env.appRoot, "bin", process.platform === "win32" ? "code.cmd" : "code"),
+			extensionPath: context.extensionPath,
+			globalStoragePath: context.globalStorageUri.fsPath,
+		});
+		const chat = await chats.focusSidebar().then(sidebar => chats.active ?? sidebar);
+		await chat?.startPrompt(prompt);
+	};
+
 	context.subscriptions.push(
 		log,
 		tree,
@@ -410,6 +445,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		),
 		vscode.commands.registerCommand("ompCustom.showLog", () => log.show()),
 	);
+	if (readConfig().checkForUpdates) void run(offerUpdate)();
 }
 
 export function deactivate(): void {}

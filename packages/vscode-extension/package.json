@@ -2,7 +2,7 @@
 	"name": "maria-code",
 	"displayName": "MarIA Code",
 	"description": "MarIA Code, the coding agent for Unicaja developers: chat, sessions, models and settings inside VS Code",
-	"version": "0.44.0",
+	"version": "0.45.0",
 	"private": true,
 	"publisher": "javimp2003",
 	"license": "MIT",
@@ -491,6 +491,11 @@
 					"type": "string",
 					"default": "~/omp-sin-workspace",
 					"description": "Folder that chats without a workspace (the globe \"+\" in the chat header) run in, created on first use. Their sessions, memory and the files they write without a path live there, shared by every window; an AGENTS.md written there on first use tells MarIA Code these chats are for general tasks (edit it to change that). `~` is your home folder."
+				},
+				"ompCustom.checkForUpdates": {
+					"type": "boolean",
+					"default": true,
+					"description": "When VS Code starts, look at the latest MarIA Code release on GitHub and, if it ships a newer extension than the installed one, offer to have MarIA Code update itself. Turn it off to make no network request at startup."
 				},
 				"ompCustom.voiceLanguage": {
 					"type": "string",

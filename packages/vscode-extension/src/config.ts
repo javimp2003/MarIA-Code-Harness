@@ -25,6 +25,8 @@ export function readConfig() {
 		longPasteLines: longPasteLimit(config.get<number>("longPasteLines", 200), 200),
 		/** Characters over which pasted text and sent prompts fold, so one very long line folds too (`0` ignores length). */
 		longPasteChars: longPasteLimit(config.get<number>("longPasteChars", 2000), 2000),
+		/** Look for a newer MarIA Code release when the extension starts (see update-check.ts). */
+		checkForUpdates: config.get<boolean>("checkForUpdates", true),
 		/** Folder chats without a workspace run in (see no-workspace.ts); may start with `~`. */
 		noWorkspaceFolder: config.get<string>("noWorkspaceFolder", "~/omp-sin-workspace").trim() || "~/omp-sin-workspace",
 	};

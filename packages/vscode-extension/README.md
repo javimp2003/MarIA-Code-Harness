@@ -32,6 +32,7 @@ MarIA Code is the coding agent for Unicaja developers and staff, inside VS Code:
 - **Editor integration**: `MarIA Code: Add Selection to Chat` (`Cmd+Alt+K` / `Ctrl+Alt+K`, editor context menu) quotes the selection with its file and lines; `MarIA Code: Add File to Chat` (Explorer context menu) inserts an `@file` mention.
 - **Questions from omp** (`ask`): a card in the middle of the chat, with the conversation and composer blurred behind it until you answer (the header stays usable, and the card comes back with your marks after the History or another chat). Several questions go step by step with a progress bar; the recommended option comes marked; "Otra respuesta…" takes typed or dictated text; Descartar stops the task. Once answered, the chat shows "Answered N questions", which unfolds into the options you chose, your own words, and the ones you left out.
 - **Dialogs**: confirmations and provider sign-in links open as native VS Code prompts.
+- **Updates**: when VS Code starts, the extension asks GitHub for the repository's latest release; if it ships a newer extension than the installed one, a popup says so with a "Dile a MarIA Code que se autoactualice" button. It opens a new chat whose prompt has MarIA Code update the extension and the `omp` engine to that release (it reads where and how each is installed, and stops to ask when it needs admin rights or cannot tell). A failed check (offline, a proxy blocking GitHub) only writes to the "MarIA Code" log. `ompCustom.checkForUpdates` turns it off.
 - `MarIA Code: Log In to a Provider…` / `MarIA Code: Log Out of a Provider…`, `MarIA Code: Compact Context`, `MarIA Code: Open MarIA Code in Terminal`, `MarIA Code: Show Log`.
 
 ## Requirements
@@ -49,6 +50,7 @@ omp must be installed. By default the extension runs `omp` from your `PATH` (`om
 | `ompCustom.fileCheckpoints` | Snapshot the workspace's git repositories around each turn so editing a prompt can restore files (default on) |
 | `ompCustom.voiceLanguage` | Language spoken to the microphone button (`es`, `en`, …); `auto` lets the speech model detect it (default) |
 | `ompCustom.noWorkspaceFolder` | Folder that chats without a workspace run in (default `~/omp-sin-workspace`); their sessions, memory and files written without a path live there |
+| `ompCustom.checkForUpdates` | Look for a newer MarIA Code release when VS Code starts and offer to update (default on); off makes no network request at startup |
 
 ## Install
 

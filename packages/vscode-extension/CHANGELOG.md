@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.45.0]
+
+### Added
+
+- When VS Code starts, the extension looks at the latest release of the repository and, if it ships a newer extension than the one installed, shows a popup with "Dile a MarIA Code que se autoactualice": it opens a new chat whose prompt has MarIA Code update the extension and the `omp` engine to that release. `ompCustom.checkForUpdates` turns the check off
+
 ## [0.44.0]
 
 ### Added
