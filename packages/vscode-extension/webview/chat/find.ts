@@ -1,20 +1,18 @@
 /**
- * Find in the conversation (Ctrl+F, ⌘F on macOS), like a browser's find bar:
+ * Find in the conversation's final answers (Ctrl+F, ⌘F on macOS):
  * every match is highlighted, the current one more strongly, with a "3/12"
  * count and Enter / Shift+Enter (or the arrows, F3) to move between them.
  *
  * Matches are painted with the CSS Custom Highlight API, so the transcript's
- * DOM is never touched while it streams; the search reruns when the
- * conversation changes. A match inside a folded block (thinking, a tool row)
- * opens it when it becomes the current one. Text of buttons and other
- * controls is not searched.
+ * DOM is untouched by highlighting. The search reruns when the conversation
+ * changes or a reply finishes.
  */
 import { h, iconButton } from "../dom";
 
 /** Elements whose text is not conversation content. */
-const SKIPPED = "button, svg, script, style, textarea, input, .msg-actions, .message-editor, [hidden]";
+const SKIPPED = "button, svg, script, style, .code-header, [hidden]";
 /** Elements that start a new line: a match never spans two of them. */
-const BLOCKS = "p, li, pre, div, td, th, h1, h2, h3, h4, h5, h6, summary, blockquote, details";
+const BLOCKS = "p, li, pre, div, td, th, h1, h2, h3, h4, h5, h6, blockquote";
 const RESEARCH_DELAY_MS = 200;
 
 interface TextPiece {
@@ -85,7 +83,12 @@ export class FindBar {
 			const active = document.activeElement;
 			this.#returnFocus = active instanceof HTMLElement && active !== document.body ? active : null;
 			this.element.hidden = false;
-			this.#observer.observe(this.root, { childList: true, subtree: true, characterData: true });
+			this.#observer.observe(this.root, {
+				childList: true,
+				subtree: true,
+				characterData: true,
+				attributeFilter: ["data-final-answer"],
+			});
 			this.#search(true);
 		}
 		this.#input.focus();
@@ -162,11 +165,8 @@ export class FindBar {
 		highlights.set("omp-find-current", new HighlightClass(...(current ? [current] : [])));
 	}
 
-	/** Open the folded blocks around a match and scroll it to the middle of the view. */
+	/** Scroll a match to the middle of the view. */
 	#reveal(range: Range): void {
-		for (let node: Node | null = range.startContainer; node && node !== this.root; node = node.parentNode) {
-			if (node instanceof HTMLDetailsElement && !node.open) node.open = true;
-		}
 		const rect = range.getBoundingClientRect();
 		const view = this.scroller.getBoundingClientRect();
 		this.scroller.scrollTop += rect.top - view.top - view.height / 2 + rect.height / 2;
@@ -181,33 +181,34 @@ export class FindBar {
 
 /**
  * Ranges of every case-insensitive occurrence of `query` (already lowercase)
- * in the text of `root`, skipping controls. Text of different blocks is
- * joined with a line break, so a match never spans two paragraphs.
+ * in the final answers of `root`, skipping controls and keeping paragraphs separate.
  */
 export function findRanges(root: HTMLElement, query: string): Range[] {
 	const pieces: TextPiece[] = [];
 	let text = "";
 	let block: Element | null = null;
-	const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
-		acceptNode: node =>
-			node instanceof Element
-				? node.matches(SKIPPED)
-					? NodeFilter.FILTER_REJECT
-					: NodeFilter.FILTER_SKIP
-				: NodeFilter.FILTER_ACCEPT,
-	});
-	for (let node = walker.nextNode(); node; node = walker.nextNode()) {
-		const value = (node as Text).data;
-		if (!value) continue;
-		const nodeBlock = node.parentElement?.closest(BLOCKS) ?? null;
-		if (nodeBlock !== block) {
-			text += "\n";
-			block = nodeBlock;
+	for (const answer of root.querySelectorAll("[data-final-answer]:not([hidden])")) {
+		const walker = document.createTreeWalker(answer, NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_TEXT, {
+			acceptNode: node =>
+				node instanceof Element
+					? node.matches(SKIPPED)
+						? NodeFilter.FILTER_REJECT
+						: NodeFilter.FILTER_SKIP
+					: NodeFilter.FILTER_ACCEPT,
+		});
+		for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+			const value = (node as Text).data;
+			if (!value) continue;
+			const nodeBlock = node.parentElement?.closest(BLOCKS) ?? answer;
+			if (nodeBlock !== block) {
+				text += "\n";
+				block = nodeBlock;
+			}
+			pieces.push({ node: node as Text, start: text.length });
+			const lower = value.toLowerCase();
+			// Lowercasing can change the length of a few characters; keep offsets exact then.
+			text += lower.length === value.length ? lower : value;
 		}
-		pieces.push({ node: node as Text, start: text.length });
-		const lower = value.toLowerCase();
-		// Lowercasing can change the length of a few characters; keep offsets exact then.
-		text += lower.length === value.length ? lower : value;
 	}
 	const ranges: Range[] = [];
 	let piece = 0;

@@ -17,7 +17,10 @@ async function tempDir(): Promise<string> {
 }
 
 const user = (text: string) => ({ type: "message", message: { role: "user", content: [{ type: "text", text }] } });
-const assistant = (...content: unknown[]) => ({ type: "message", message: { role: "assistant", content } });
+const assistant = (stopReason: string | undefined, ...content: unknown[]) => ({
+	type: "message",
+	message: { role: "assistant", stopReason, content },
+});
 const toolResult = (text: string) => ({
 	type: "message",
 	message: { role: "toolResult", toolName: "bash", content: [{ type: "text", text }] },
@@ -31,39 +34,71 @@ async function writeSession(dir: string, name: string, entries: unknown[]): Prom
 }
 
 describe("session search", () => {
-	it("finds words from answers, thinking, tool calls and tool output, not only prompts", async () => {
+	it("finds a final answer but ignores metadata, prompts, reasoning, tool activity and summaries", async () => {
 		const dir = await tempDir();
 		const file = await writeSession(dir, "a", [
-			user("revisa el despliegue"),
+			{ type: "title_change", title: "despliegue" },
+			user("revisa kubernetes"),
 			assistant(
-				{ type: "thinking", thinking: "maybe the readiness probe" },
+				"toolUse",
+				{ type: "text", text: "Comprobaré el contenedor" },
 				{ type: "toolCall", name: "bash", arguments: { command: "kubectl get pods -n pagos" } },
 			),
 			toolResult("Error: ImagePullBackOff for registry.unicaja/api:1.4"),
-			assistant({ type: "text", text: "El pod falla al descargar la imagen" }),
+			{ type: "compaction", summary: "La incidencia fue escalada" },
+			assistant(
+				"stop",
+				{ type: "thinking", thinking: "maybe the readiness probe" },
+				{ type: "text", text: "El pod falla al descargar la imagen" },
+			),
 		]);
-		await writeSession(dir, "b", [user("otra cosa"), assistant({ type: "text", text: "nada que ver" })]);
 		const search = new SessionSearch();
 
-		for (const [query, source] of [
-			["readiness", "thinking"],
-			["pagos", "tool"],
-			["ImagePullBackOff", "output"],
-			["descargar", "answer"],
-		] as const) {
-			const hits = await search.search([dir], query);
-			expect(hits.map(hit => hit.path)).toEqual([file]);
-			expect(hits[0]!.snippet?.source).toBe(source);
+		const hits = await search.search([dir], "descargar");
+		expect(hits.map(hit => hit.path)).toEqual([file]);
+		const snippet = hits[0]!.snippet!;
+		expect(snippet.text.slice(...snippet.ranges[0]!)).toBe("descargar");
+		for (const query of [
+			"despliegue",
+			"kubernetes",
+			"contenedor",
+			"pagos",
+			"ImagePullBackOff",
+			"escalada",
+			"readiness",
+		]) {
+			expect(await search.search([dir], query)).toEqual([]);
 		}
 	});
 
-	it("ignores case and accents, and needs every term but not in the same message", async () => {
+	it("excludes progress text and incomplete turns from the results", async () => {
+		const dir = await tempDir();
+		const paused = assistant("stop", { type: "text", text: "analizando" });
+		const file = await writeSession(dir, "a", [
+			{ ...paused, message: { ...paused.message, stopDetails: { type: "pause_turn" } } },
+			assistant("aborted", { type: "text", text: "interrumpido" }),
+			assistant("stop", { type: "text", text: "investigación" }, { type: "toolCall", name: "bash", arguments: {} }),
+			assistant(
+				"stop",
+				{ type: "text", text: "revisando", textSignature: '{"v":1,"id":"msg_1","phase":"commentary"}' },
+				{ type: "text", text: "resuelto", textSignature: '{"v":1,"id":"msg_2","phase":"final_answer"}' },
+			),
+		]);
+		const search = new SessionSearch();
+
+		expect((await search.search([dir], "resuelto")).map(hit => hit.path)).toEqual([file]);
+		for (const query of ["analizando", "interrumpido", "investigación", "revisando"]) {
+			expect(await search.search([dir], query)).toEqual([]);
+		}
+	});
+
+	it("ignores case and accents and finds terms across final answers, including legacy replies", async () => {
 		const dir = await tempDir();
 		const file = await writeSession(dir, "a", [
-			user("¿Por qué falla la canción?"),
-			assistant({ type: "text", text: "Revisa el Códec de audio" }),
+			assistant(undefined, { type: "text", text: "Falla la canción" }),
+			assistant("stop", { type: "text", text: "Revisa el Códec de audio" }),
 		]);
-		await writeSession(dir, "b", [user("cancion sin más")]);
+		await writeSession(dir, "b", [assistant("stop", { type: "text", text: "cancion sin más" })]);
 		const search = new SessionSearch();
 
 		expect((await search.search([dir], "CANCION codec")).map(hit => hit.path)).toEqual([file]);
@@ -72,10 +107,13 @@ describe("session search", () => {
 		expect(hit!.snippet!.text.slice(...hit!.snippet!.ranges[0]!)).toBe("Códec");
 	});
 
-	it("matches words one edit away only for terms no session contains as typed", async () => {
+	it("matches words one edit away only for terms no final answer contains as typed", async () => {
 		const dir = await tempDir();
-		const file = await writeSession(dir, "a", [user("configura el kubernetes ingress")]);
-		await writeSession(dir, "b", [user("el ingres de la semana")]);
+		const file = await writeSession(dir, "a", [
+			user("kubernetis"),
+			assistant("stop", { type: "text", text: "configura el kubernetes ingress" }),
+		]);
+		await writeSession(dir, "b", [assistant("stop", { type: "text", text: "el ingres de la semana" })]);
 		const search = new SessionSearch();
 
 		const typo = await search.search([dir], "kubernetis");
@@ -85,14 +123,16 @@ describe("session search", () => {
 		expect((await search.search([dir], "ingress")).map(hit => hit.path)).toEqual([file]);
 	});
 
-	it("ranks a session that has the terms in a prompt above one that only has them in tool output", async () => {
+	it("ranks a session that has the full phrase above one that has the terms in different answers", async () => {
 		const dir = await tempDir();
-		const inOutput = await writeSession(dir, "a", [user("hola"), toolResult("timeout reached")]);
-		const inPrompt = await writeSession(dir, "b", [user("por qué hay un timeout")]);
+		const split = await writeSession(dir, "a", [
+			assistant("stop", { type: "text", text: "Clear the cache" }),
+			assistant("stop", { type: "text", text: "Retry after a timeout" }),
+		]);
+		const phrase = await writeSession(dir, "b", [assistant("stop", { type: "text", text: "Fix the cache timeout" })]);
+		const hits = await new SessionSearch().search([dir], "cache timeout");
 
-		const hits = await new SessionSearch().search([dir], "timeout");
-
-		expect(hits.map(hit => hit.path)).toEqual([inPrompt, inOutput]);
+		expect(hits.map(hit => hit.path)).toEqual([phrase, split]);
 	});
 
 	it("sees what a running session appended since the last search", async () => {
@@ -101,7 +141,7 @@ describe("session search", () => {
 		const search = new SessionSearch();
 		expect(await search.search([dir], "zanahoria")).toEqual([]);
 
-		await fs.appendFile(file, `${JSON.stringify(assistant({ type: "text", text: "una zanahoria" }))}\n`);
+		await fs.appendFile(file, `${JSON.stringify(assistant("stop", { type: "text", text: "una zanahoria" }))}\n`);
 
 		expect((await search.search([dir], "zanahoria")).map(hit => hit.path)).toEqual([file]);
 	});

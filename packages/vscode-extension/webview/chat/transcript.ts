@@ -16,6 +16,7 @@ import type {
 } from "../../src/protocol";
 import { isSkillPromptDetails, isUserPrompt, type SkillPromptDetails, skillPromptDraft } from "../../src/protocol";
 import { parseQuotedPrompt, type QuotedPrompt, quotedPrompt } from "../../src/quoted-prompt";
+import { finalAnswerBlocks } from "../../src/search-text";
 import { button, h, iconButton } from "../dom";
 import { icon } from "../icons";
 import { setTooltip } from "../tooltip";
@@ -345,6 +346,7 @@ class AssistantView {
 
 	update(message: AssistantMessage, streaming: boolean): void {
 		const content = message.content ?? [];
+		const answers = streaming ? [] : finalAnswerBlocks(message);
 		for (let index = 0; index < content.length; index++) {
 			const block = content[index]!;
 			if (this.#slots[index]?.type !== block.type) this.#truncate(index);
@@ -361,6 +363,7 @@ class AssistantView {
 						slot.el.innerHTML = renderMarkdown(block.text);
 					}
 					slot.el.hidden = block.text.trim() === "";
+					slot.el.toggleAttribute("data-final-answer", answers.includes(block));
 					break;
 				case "thinking": {
 					const details = slot.el as HTMLDetailsElement;

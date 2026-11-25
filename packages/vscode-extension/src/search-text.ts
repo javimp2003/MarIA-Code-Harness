@@ -1,12 +1,44 @@
 /**
- * Text matching shared by the history search on both sides (the host's search
- * through every message and the panel's instant filter on names): queries and
- * texts are folded to lowercase without accents, so "Cancion" finds "canción".
- * No Node or DOM APIs: the webview imports it too.
+ * The host and webview agree on which assistant text to search. History
+ * folds queries and replies to lowercase without accents.
  */
+import type { TextContent } from "./protocol";
 
 const ASCII = /^[\x00-\x7f]*$/;
 const MARKS = /\p{M}/gu;
+type AnswerBlock = Pick<TextContent, "type" | "text">;
+
+/** Search completed replies, including older messages without a stop reason. */
+export function finalAnswerBlocks(message: {
+	content?: unknown;
+	stopReason?: string;
+	stopDetails?: { type?: string } | null;
+}): AnswerBlock[] {
+	const { content, stopReason, stopDetails } = message;
+	if (!Array.isArray(content) || stopDetails?.type === "pause_turn") return [];
+	if (stopReason !== undefined && stopReason !== "stop" && stopReason !== "length") return [];
+
+	const blocks: ({ type?: unknown; text?: unknown; textSignature?: unknown } | null)[] = content;
+	const usedTools = blocks.some(block => block?.type === "toolCall");
+	return blocks.filter((block): block is AnswerBlock => {
+		if (block?.type !== "text" || typeof block.text !== "string") return false;
+		const phase = textPhase(block.textSignature);
+		return phase === "final_answer" || (!usedTools && phase !== "commentary");
+	});
+}
+
+/** Versioned text signatures can distinguish progress updates from final answers. */
+function textPhase(signature: unknown): "commentary" | "final_answer" | undefined {
+	if (typeof signature !== "string" || !signature.startsWith("{")) return undefined;
+	try {
+		const value: { v?: unknown; id?: unknown; phase?: unknown } | null = JSON.parse(signature);
+		if (value?.v === 1 && typeof value.id === "string")
+			return value.phase === "commentary" || value.phase === "final_answer" ? value.phase : undefined;
+	} catch {
+		// Older signatures can be plain IDs.
+	}
+	return undefined;
+}
 
 /**
  * `text` in lowercase without diacritics, with the same length so an offset in

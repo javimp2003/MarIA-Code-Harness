@@ -9,8 +9,7 @@ import { setTooltip } from "../tooltip";
 
 /** Example queries of the popup, each with what it shows off. */
 const EXAMPLES: { query: string; what: string }[] = [
-	{ query: "ImagePullBackOff", what: "an error a command printed" },
-	{ query: "kubectl pagos", what: "two words anywhere in the same chat" },
+	{ query: "cache timeout", what: "two words anywhere in the chat's final answers" },
 	{ query: '"connection refused"', what: "an exact phrase" },
 	{ query: "migracion", what: "finds “migración” too" },
 ];
@@ -61,39 +60,17 @@ export class SearchHelp {
 		});
 
 		this.#popover.append(
-			h("div", { className: "history-help-title" }, "Search finds anything you saw in a chat"),
-			section(
-				"What it looks through",
-				["Chat names, every prompt you sent, and MarIA Code's answers and thinking."],
-				[
-					"The commands, files and patterns of every tool it ran, and ",
-					h("strong", null, "what those tools returned"),
-					" (outputs, errors, files it read).",
-				],
-				["Summaries of compacted conversations."],
-			),
+			h("div", { className: "history-help-title" }, "Search MarIA Code's final answers"),
 			section(
 				"How it matches",
 				["Case and accents don't matter."],
-				["Every word must appear, anywhere in the chat (not necessarily in the same message)."],
+				["Every word must appear in the chat's final answers. Words can match in different answers."],
 				["Put a phrase in quotes to find it as written: ", code('"connection refused"'), "."],
 				["A word found in no chat (a typo) matches similar words, shown with a dotted underline."],
 			),
 			section(
 				"Results",
-				[
-					"Each result says where it matched (",
-					code("You"),
-					", ",
-					code("MarIA Code"),
-					", ",
-					code("Tool"),
-					", ",
-					code("Output"),
-					"…), with the words around it; ",
-					code("+3"),
-					" means 3 more places in that chat match.",
-				],
+				["Each result shows a matching excerpt. ", code("+3"), " means 3 more places in that chat match."],
 				[
 					"Opening a result jumps to the match in the conversation. Use ",
 					code("↑"),

@@ -228,20 +228,17 @@ export interface SessionListItem {
 	proposals: number;
 }
 
-/** Kind of session text a search matched: a title, a prompt, an answer, thinking, a tool call, a tool's output, a compaction summary. */
-export type SearchSource = "title" | "prompt" | "answer" | "thinking" | "tool" | "output" | "summary";
-
-/** A session whose texts contain every term of a history search. */
+/** A session whose final answers contain every term of a history search. */
 export interface SessionSearchHit {
 	path: string;
-	/** Higher when the terms are in more important texts (titles, prompts) or found as typed. */
+	/** Higher when the query appears as a phrase. */
 	score: number;
-	/** How many texts of the session matched (messages, tool calls, outputs…). */
+	/** How many final answer blocks matched. */
 	count: number;
 	/** Some term was not found as typed in any session: words close to it matched instead. */
 	fuzzy: boolean;
 	/** The text where most terms were found, cut around them; `ranges` are the matches in `text`. */
-	snippet?: { source: SearchSource; text: string; ranges: [number, number][] };
+	snippet?: { text: string; ranges: [number, number][] };
 }
 
 /** Text a local slash command printed, and when (epoch ms, comparable with message timestamps). */
@@ -348,7 +345,7 @@ export type ChatUpdate =
 	| { type: "sessionActivity"; activity: Record<string, SessionActivity> }
 	/** Pending skill proposals per session file (sessions without any are absent); sent when they change. */
 	| { type: "sessionProposals"; counts: Record<string, number> }
-	/** Sessions matching a history search through all their messages (answer to `searchSessions`, best first). */
+	/** Sessions with matching final answers (answer to `searchSessions`, best first). */
 	| { type: "sessionSearch"; query: string; hits: SessionSearchHit[] }
 	/**
 	 * omp asks to approve the plan it proposed: show it in the chat with `options`
@@ -409,7 +406,7 @@ export type ChatRequest =
 	| { type: "newSessionInTab"; noWorkspace: boolean }
 	/** List the sessions for the history panel; the host answers with `sessions`. */
 	| { type: "listSessions" }
-	/** Search every message of the history panel's sessions; the host answers with `sessionSearch`. */
+	/** Search final answers in the history panel's sessions. */
 	| { type: "searchSessions"; query: string }
 	| { type: "openSession"; path: string }
 	/** Rename the session at `path`, or the open one when `path` is absent; the host re-sends `sessions`. */

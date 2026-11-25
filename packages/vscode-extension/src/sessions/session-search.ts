@@ -1,23 +1,19 @@
 /**
- * Search through everything a session file holds: its titles, the user's
- * prompts, MarIA Code's answers and thinking, the tools it called (commands,
- * paths, patterns), what those tools returned, and compaction summaries.
+ * Search the final answers in a session file.
  *
  * Each file is read whole once and kept as folded text (see search-text.ts)
  * until it changes on disk (size or mtime), so typing a query costs a scan of
  * memory, not of the disk. Every term of the query must appear somewhere in a
- * session, in any message; a term found in no session at all (a typo) also
- * matches words one or two edits away from it.
+ * session's answers. A term found in no answer also matches words one or two
+ * edits away from it.
  */
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
-import type { SearchSource, SessionSearchHit } from "../protocol";
-import { parseQuotedPrompt } from "../quoted-prompt";
-import { foldText, parseQuery, termRanges } from "../search-text";
-import { type SessionLine, userPromptContent } from "./session-store";
+import type { SessionSearchHit } from "../protocol";
+import { finalAnswerBlocks, foldText, parseQuery, termRanges } from "../search-text";
+import type { SessionLine } from "./session-store";
 
 interface Segment {
-	source: SearchSource;
 	text: string;
 	folded: string;
 }
@@ -34,17 +30,6 @@ interface CacheEntry {
 	doc: Promise<SessionDoc>;
 }
 
-/** How much a term found in each kind of text adds to a session's score. */
-const WEIGHTS: Record<SearchSource, number> = {
-	title: 100,
-	prompt: 40,
-	answer: 20,
-	summary: 15,
-	thinking: 8,
-	tool: 8,
-	output: 4,
-};
-
 /** Characters of context kept before the first match of a snippet, and its whole length. */
 const SNIPPET_BEFORE = 24;
 const SNIPPET_LENGTH = 180;
@@ -59,8 +44,8 @@ export class SessionSearch {
 	#idle: NodeJS.Timeout | undefined;
 
 	/**
-	 * Sessions of `dirs` whose text contains every term of `query`, best first;
-	 * each with a snippet of the text where most terms were found.
+	 * Sessions of `dirs` whose final answers contain every term of `query`, best
+	 * first, with a snippet of the answer text where most terms were found.
 	 */
 	async search(dirs: readonly string[], query: string): Promise<SessionSearchHit[]> {
 		const terms = parseQuery(query);
@@ -133,82 +118,25 @@ export class SessionSearch {
 	}
 }
 
-/** The searchable texts of one session file, in file order. */
+/** Final answer blocks of one session file, in file order. */
 async function readDoc(file: string): Promise<SessionDoc> {
 	const segments: Segment[] = [];
-	const add = (source: SearchSource, text: string | undefined) => {
-		const trimmed = text?.trim();
-		if (trimmed) segments.push({ source, text: trimmed, folded: foldText(trimmed) });
-	};
 	for (const line of (await fs.readFile(file, "utf8")).split("\n")) {
 		if (!line.trim()) continue;
-		let entry: SessionLine & { summary?: unknown; message?: { thinking?: unknown } };
+		let entry: SessionLine | null;
 		try {
 			entry = JSON.parse(line);
 		} catch {
 			// A line still being written by a running session; the next read gets it whole.
 			continue;
 		}
-		if (entry.type === "title" || entry.type === "title_change") {
-			add("title", entry.title);
-			continue;
-		}
-		if (entry.type === "compaction" || entry.type === "branch_summary") {
-			if (typeof entry.summary === "string") add("summary", entry.summary);
-			continue;
-		}
-		const prompt = userPromptContent(entry);
-		if (prompt !== undefined) {
-			const typed = blockText(prompt);
-			const quoted = parseQuotedPrompt(typed);
-			add("prompt", quoted ? `${quoted.message}\n${quoted.selection}` : typed);
-			continue;
-		}
-		if (entry.type === "custom_message") {
-			// Notices omp adds to the conversation, e.g. the output of a background job.
-			add("output", blockText(entry.content));
-			continue;
-		}
-		if (entry.type !== "message") continue;
-		const role = entry.message?.role;
-		const content = entry.message?.content;
-		if (role === "assistant" && Array.isArray(content)) {
-			for (const block of content as Record<string, unknown>[]) {
-				if (block?.type === "text" && typeof block.text === "string") add("answer", block.text);
-				else if (block?.type === "thinking" && typeof block.thinking === "string") add("thinking", block.thinking);
-				else if (block?.type === "toolCall") {
-					add(
-						"tool",
-						[typeof block.name === "string" ? block.name : "", ...stringValues(block.arguments)].join(" "),
-					);
-				}
-			}
-		} else if (role === "toolResult" || role === "custom") {
-			add("output", blockText(content));
+		if (entry?.type !== "message" || entry.message?.role !== "assistant") continue;
+		for (const block of finalAnswerBlocks(entry.message)) {
+			const text = block.text.trim();
+			if (text) segments.push({ text, folded: foldText(text) });
 		}
 	}
 	return { segments };
-}
-
-/** Text of a message content: a string, or its text blocks joined by line breaks (images are skipped). */
-function blockText(content: unknown): string {
-	if (typeof content === "string") return content;
-	if (!Array.isArray(content)) return "";
-	return content
-		.filter(
-			(block): block is { type: "text"; text: string } => block?.type === "text" && typeof block.text === "string",
-		)
-		.map(block => block.text)
-		.join("\n");
-}
-
-/** Every string (and number) inside a tool call's arguments, depth first: commands, paths, patterns. */
-function stringValues(value: unknown): string[] {
-	if (typeof value === "string") return [value];
-	if (typeof value === "number") return [String(value)];
-	if (Array.isArray(value)) return value.flatMap(stringValues);
-	if (value && typeof value === "object") return Object.values(value).flatMap(stringValues);
-	return [];
 }
 
 /** Words of the session one or two edits away from `term` (none for phrases and short terms). */
@@ -252,10 +180,8 @@ function editDistance(a: string, b: string, limit: number): number {
 }
 
 /**
- * Score of a matching session (each term counts by the most important kind of
- * text it was found in, halved when approximate; the whole query found as typed
- * adds more), how many texts matched, and the snippet of the best one: the text
- * holding the most terms, the most important kind breaking ties.
+ * Score of a matching session, how many blocks matched, and a snippet from
+ * the block holding the most terms.
  */
 function scoreSession(
 	file: string,
@@ -265,16 +191,8 @@ function scoreSession(
 	fuzzy: boolean,
 ): SessionSearchHit {
 	const all = variants.flat();
-	let score = 0;
-	terms.forEach((term, index) => {
-		let best = 0;
-		for (const segment of doc.segments) {
-			if (variants[index]!.some(variant => segment.folded.includes(variant)))
-				best = Math.max(best, WEIGHTS[segment.source]);
-		}
-		score += term === variants[index]![0] && variants[index]!.length === 1 ? best : best / 2;
-	});
 	const phrase = terms.join(" ");
+	const exactPhrase = terms.length > 1 && doc.segments.some(segment => segment.folded.includes(phrase));
 	let count = 0;
 	let snippetSegment: Segment | undefined;
 	let snippetRank = -1;
@@ -282,16 +200,14 @@ function scoreSession(
 		const present = variants.filter(found => found.some(variant => segment.folded.includes(variant))).length;
 		if (present === 0) continue;
 		count++;
-		const rank = present * 1000 + WEIGHTS[segment.source];
-		if (rank > snippetRank) {
-			snippetRank = rank;
+		if (present > snippetRank) {
+			snippetRank = present;
 			snippetSegment = segment;
 		}
 	}
-	if (terms.length > 1 && doc.segments.some(segment => segment.folded.includes(phrase))) score += 50;
 	return {
 		path: file,
-		score,
+		score: Number(exactPhrase),
 		count,
 		fuzzy,
 		snippet: snippetSegment && snippet(snippetSegment, all),
@@ -333,7 +249,7 @@ function snippet(segment: Segment, terms: readonly string[]): SessionSearchHit["
 	}
 	if (open !== undefined) ranges.push([open, text.length]);
 	if (end < segment.text.length) text += "…";
-	return { source: segment.source, text, ranges };
+	return { text, ranges };
 }
 
 /** One search index for the whole extension host: every chat view shares what was read. */

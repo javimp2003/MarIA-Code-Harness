@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.46.0]
+
+### Changed
+
+- Find in Chat and History search only MarIA Code's final answers.
+
 ## [0.45.0]
 
 ### Added

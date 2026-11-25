@@ -205,6 +205,8 @@ export interface SessionLine {
 	message?: {
 		role?: string;
 		content?: unknown;
+		stopReason?: string;
+		stopDetails?: { type?: string } | null;
 		synthetic?: boolean;
 		customType?: string;
 		attribution?: string;

@@ -17,8 +17,8 @@
  * cards), and those with skill proposals a pill counting them while hovered. Ages
  * count from MarIA Code's last reply or a branch's creation if its replies were inherited.
  */
-import type { ChatRequest, SearchSource, SessionActivity, SessionListItem, SessionSearchHit } from "../../src/protocol";
-import { foldText, parseQuery, termRanges } from "../../src/search-text";
+import type { ChatRequest, SessionActivity, SessionListItem, SessionSearchHit } from "../../src/protocol";
+import { parseQuery } from "../../src/search-text";
 import { h, iconButton } from "../dom";
 import { icon } from "../icons";
 import { setTooltip } from "../tooltip";
@@ -35,27 +35,16 @@ import { SearchHelp } from "./history-search-help";
 
 type Post = (request: ChatRequest) => void;
 
-/** Pause in typing before the host searches every message. */
+/** Pause in typing before the host searches final answers. */
 const SEARCH_DELAY_MS = 150;
-
-/** How a search snippet names the kind of text it comes from. */
-const SOURCE_LABELS: Record<SearchSource, string> = {
-	title: "Title",
-	prompt: "You",
-	answer: "MarIA Code",
-	thinking: "Thinking",
-	tool: "Tool",
-	output: "Output",
-	summary: "Summary",
-};
 
 export class HistoryPanel {
 	readonly element: HTMLElement;
 	#search = h("input", {
 		type: "text",
 		className: "history-search",
-		placeholder: "Search chats",
-		ariaLabel: "Search chats",
+		placeholder: "Search final answers",
+		ariaLabel: "Search final answers",
 	});
 	#list = h("div", { className: "history-list", role: "listbox" });
 	#workspaceTab = h("button", { type: "button", className: "history-tab", role: "tab" });
@@ -81,7 +70,7 @@ export class HistoryPanel {
 	#folded = new Set<SectionId>(FOLDED_BY_DEFAULT);
 	/** Group of the chat this view shows, from its `state`; the panel opens on it. */
 	#chatNoWorkspace: boolean | undefined;
-	/** The host's matches through every message, by session file, for `#hitsQuery`. */
+	/** The host's matches in final answers, by session file, for `#hitsQuery`. */
 	#hits = new Map<string, SessionSearchHit>();
 	/** Query `#hits` answers; undefined before the first answer of this opening. */
 	#hitsQuery: string | undefined;
@@ -229,7 +218,7 @@ export class HistoryPanel {
 		if (query !== this.#search.value.trim()) return;
 		this.#hits = new Map(hits.map(hit => [hit.path, hit]));
 		this.#hitsQuery = query;
-		// The list just grew with the matches inside messages: start again from the top.
+		// The results came in: start again from the top.
 		this.#select(0, undefined);
 		if (this.isOpen && this.#editing === undefined) this.#render();
 	}
@@ -266,26 +255,18 @@ export class HistoryPanel {
 			return;
 		}
 		const query = this.#search.value.trim();
-		const terms = parseQuery(query);
-		const searching = terms.length > 0;
+		const searching = parseQuery(query).length > 0;
 		// The host's hits, once it answered this very query.
 		const hits = this.#hitsQuery === query ? this.#hits : undefined;
-		// Names and prompts filter at once; the host's search through every message adds its hits.
 		const pending = searching && !hits;
-		const found = searching
-			? this.#sessions.filter(item => {
-					if (hits?.has(item.path)) return true;
-					const known = foldText(`${item.label}\n${item.firstPrompt ?? ""}\n${item.lastPrompt ?? ""}`);
-					return terms.every(term => known.includes(term));
-				})
-			: this.#sessions;
+		const found = searching ? this.#sessions.filter(item => hits?.has(item.path)) : this.#sessions;
 		this.#renderTabs(found);
 		const group = found.filter(item => item.noWorkspace === this.#noWorkspace);
 		if (group.length === 0) {
 			this.#matches = [];
 			const empty = this.#noWorkspace ? "No chats without a workspace yet" : "No chats in this workspace yet";
 			const inGroup = this.#sessions.some(item => item.noWorkspace === this.#noWorkspace);
-			const message = !inGroup ? empty : pending ? "Searching all messages…" : "No matches";
+			const message = !inGroup ? empty : pending ? "Searching final answers…" : "No matches";
 			this.#list.replaceChildren(h("div", { className: "history-empty" }, message));
 			return;
 		}
@@ -320,7 +301,9 @@ export class HistoryPanel {
 			if (cards) children.push(cards);
 			for (const item of items) {
 				this.#matches.push(item);
-				const row = cards ? this.#card(item, now) : this.#row(item, now, terms, hits?.get(item.path));
+				const row = cards
+					? this.#card(item, now)
+					: this.#row(item, now, searching ? hits?.get(item.path) : undefined);
 				rows.push(row);
 				if (cards) cards.append(row);
 				else children.push(row);
@@ -466,11 +449,9 @@ export class HistoryPanel {
 		});
 	}
 
-	#row(item: SessionListItem, now: number, terms: readonly string[], hit: SessionSearchHit | undefined): HTMLElement {
+	#row(item: SessionListItem, now: number, hit: SessionSearchHit | undefined): HTMLElement {
 		const editing = item.path === this.#editing;
-		const label = editing
-			? this.#renameInput(item)
-			: h("span", { className: "history-label" }, ...highlight(item.label, terms));
+		const label = editing ? this.#renameInput(item) : h("span", { className: "history-label" }, item.label);
 		const [rename, remove] = this.#actions(item);
 		const age = h("span", { className: "history-age" }, compactAge(item.historyAt, now));
 		const ageLabel = item.historyAt > item.lastReply ? "Branch created" : "MarIA Code's last reply";
@@ -494,7 +475,7 @@ export class HistoryPanel {
 				editing ? null : remove,
 			),
 			editing ? null : this.#origin(item),
-			editing ? null : this.#preview(item, terms, hit),
+			editing ? null : this.#preview(item, hit),
 		);
 		this.#wireOpen(row, item, editing);
 		return row;
@@ -709,13 +690,11 @@ export class HistoryPanel {
 		const snippet = this.#hitsQuery === query ? this.#hits.get(item.path)?.snippet : undefined;
 		this.close();
 		this.post({ type: "openSession", path: item.path });
-		// Land on the match: titles are not part of the conversation, everything else is.
 		const range = snippet?.ranges[0];
-		if (snippet && range && snippet.source !== "title")
-			this.onFind(item.path, snippet.text.slice(range[0], range[1]));
+		if (snippet && range) this.onFind(item.path, snippet.text.slice(range[0], range[1]));
 	}
 
-	/** The search box's text changed: filter at once and ask the host to search every message once typing pauses. */
+	/** Ask the host for matching final answers once typing pauses. */
 	#queryChanged(): void {
 		this.#select(0, undefined);
 		window.clearTimeout(this.#searchTimer);
@@ -726,16 +705,12 @@ export class HistoryPanel {
 		this.#render();
 	}
 
-	/**
-	 * Line under the name while searching: where the host found the terms (which
-	 * kind of text, the words around them, how many more texts matched), else the
-	 * chat's latest prompt with the terms marked.
-	 */
-	#preview(item: SessionListItem, terms: readonly string[], hit: SessionSearchHit | undefined): HTMLElement | null {
-		const snippet = terms.length ? hit?.snippet : undefined;
+	/** Show the matching answer snippet when searching, or the latest prompt when browsing. */
+	#preview(item: SessionListItem, hit: SessionSearchHit | undefined): HTMLElement | null {
+		const snippet = hit?.snippet;
 		if (!snippet || !hit) {
 			const preview = previewOf(item);
-			return preview ? h("div", { className: "history-preview" }, ...highlight(preview, terms)) : null;
+			return preview ? h("div", { className: "history-preview" }, preview) : null;
 		}
 		const more =
 			hit.count > 1
@@ -753,7 +728,6 @@ export class HistoryPanel {
 		const line = h(
 			"div",
 			{ className: `history-preview history-snippet${hit.fuzzy ? " fuzzy" : ""}` },
-			h("span", { className: "history-snippet-source" }, SOURCE_LABELS[snippet.source]),
 			h("span", { className: "history-snippet-text" }, ...marked(snippet.text, snippet.ranges)),
 			more,
 		);
@@ -847,11 +821,6 @@ function widenColumn(cards: HTMLElement, card: HTMLElement | undefined): void {
 		{ length: count },
 		(_, index) => `minmax(0, ${index === column ? wide : narrow}fr)`,
 	).join(" ");
-}
-
-/** `text` with the folded occurrences of `terms` (see search-text.ts) wrapped in `<mark>`. */
-function highlight(text: string, terms: readonly string[]): (string | HTMLElement)[] {
-	return terms.length ? marked(text, termRanges(foldText(text), terms)) : [text];
 }
 
 /** `text` with the `[start, end)` ranges (sorted, not overlapping) wrapped in `<mark>`. */
