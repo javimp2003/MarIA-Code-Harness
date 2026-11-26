@@ -201,6 +201,32 @@ describe("opencode and gpt session header on OpenAI transports", () => {
 		expect(headersSeen[0]?.get("session_id")).toBeNull();
 	});
 
+	for (const api of ["openai-completions", "openai-responses"] as const) {
+		it(`sends the conversation id for a static custom ${api} model configured with a session header`, () => {
+			const model = buildModel({
+				id: "proxy-model",
+				name: "Proxy Model",
+				api,
+				provider: "private-gateway",
+				baseUrl: "https://gateway.example/v1",
+				reasoning: false,
+				input: ["text"],
+				cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+				contextWindow: 200_000,
+				maxTokens: 8192,
+				compat: { sessionHeader: "x-litellm-session-id" },
+			});
+
+			const setup = resolveOpenAIRequestSetup(model, {
+				apiKey: "key",
+				messages: [],
+				sessionId: "conversation",
+			});
+
+			expect(new Headers(setup.requestHeaders).get("x-litellm-session-id")).toBe("conversation");
+		});
+	}
+
 	it("keeps a configured x-litellm-session-id over inferred conversation and cache affinity", () => {
 		const setup = resolveOpenAIRequestSetup(makeLiteLLMCompletionsModel(), {
 			apiKey: "key",

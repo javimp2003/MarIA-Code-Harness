@@ -588,6 +588,7 @@ function detectOpenAICompat(
 		emptyLengthFinishIsContextError: false,
 		usesOpenAIToolCallIdLimit: false,
 		promptCacheSessionHeader: hostMatchesUrl(baseUrl, "xai") ? "x-grok-conv-id" : undefined,
+		sessionHeader: undefined,
 		dropThinkingWhenReasoningEffort: false,
 		nativeKimiK3Reasoning: false,
 		zaiReasoningEffortDialect: false,
@@ -807,6 +808,7 @@ function resolveOpenAIResponsesPolicy(
 		emptyLengthFinishIsContextError: false,
 		usesOpenAIToolCallIdLimit: false,
 		promptCacheSessionHeader: hostMatchesUrl(baseUrl, "xai") ? "x-grok-conv-id" : undefined,
+		sessionHeader: undefined,
 		streamFirstEventTimeoutMs: isLocalServingBackend ? 0 : spec.compat?.streamFirstEventTimeoutMs,
 		streamIdleTimeoutMs: isLocalServingBackend
 			? LOCAL_OPENAI_COMPAT_STREAM_IDLE_TIMEOUT_MS
