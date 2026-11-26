@@ -338,6 +338,26 @@ export const stateDefs = {
 		},
 		"One background job of the session.",
 	),
+	McpServer: {
+		name: "string",
+		scope: "'project' | 'user' | 'external'",
+		configPath: "string",
+		type: "string",
+		location: "string",
+		enabled: "boolean",
+		status: "'connected' | 'connecting' | 'disconnected' | 'disabled' | 'inactive'",
+		tools: "number",
+		"reason?": "string",
+	},
+	McpServers: {
+		servers: "McpServer[]",
+		projectConfigPath: "string",
+		userConfigPath: "string",
+		projectEnabled: "boolean",
+		busy: "boolean",
+		"message?": "string",
+		"warning?": "string",
+	},
 	SessionSkill: doc(
 		{
 			name: doc("string", "Name the skill is invoked by (`/skill:<name>`, `skill://<name>`)."),

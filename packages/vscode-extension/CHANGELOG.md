@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.47.0]
+
+### Added
+
+- Add and manage MCP servers visually from the chat header or Settings, with project/user scope, HTTP/SSE and local commands, credentials, connection status and checks, activation and removal.
+
 ## [0.46.0]
 
 ### Changed

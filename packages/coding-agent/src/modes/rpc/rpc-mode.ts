@@ -82,6 +82,8 @@ import { RpcPlanController } from "./rpc-plan";
 import { RpcLiveBridge, type RpcLiveSessionFactory } from "./rpc-live";
 import { RpcDictationBridge, type RpcDictationControllerFactory, RpcDictationError } from "./rpc-dictation";
 import { RpcOutputWriter } from "./rpc-output";
+import { RpcMcpController } from "./rpc-mcp";
+import type { MCPManager } from "../../mcp/manager";
 import {
 	RpcExtensionUserMessageTracker,
 	RpcPromptResults,
@@ -1457,6 +1459,8 @@ export function registerRpcPromptMaterialization(
 
 /** Startup options for {@link runRpcMode}. */
 export interface RpcModeOptions {
+	/** This session's MCP manager; omitted when MCP is disabled. Never borrow a process-global manager. */
+	mcpManager?: MCPManager;
 	/** `--mode rpc-ui`: route tool UI (e.g. ask) over the protocol, independently of headless extensions. */
 	setToolUIContext?: (uiContext: ExtensionUIContext, hasUI: boolean) => void;
 	/** `--no-ui`: extensions run with `hasUI=false` and no UI frames; tool UI and host-issued login are unaffected. */
@@ -1905,6 +1909,7 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 	});
 	await emitAvailableCommandsUpdate();
 
+	const mcpController = new RpcMcpController(session, options.mcpManager, session.sessionManager.getCwd());
 	const inputGate = new RpcUserInputGate();
 	type OrderedUserInput = Extract<RpcCommand, { type: "prompt" | "steer" | "follow_up" | "abort_and_prompt" }>;
 	type OrderedInputOutcome = "local" | "cancelled" | "admitted" | "builtin-agent";
@@ -2288,6 +2293,13 @@ export async function runRpcMode(session: AgentSession, options: RpcModeOptions 
 
 			case "get_available_commands": {
 				return success(id, "get_available_commands", { commands: await getAvailableCommands() });
+			}
+
+			case "get_mcp_servers": {
+				return success(id, "get_mcp_servers", await mcpController.list());
+			}
+			case "manage_mcp_server": {
+				return success(id, "manage_mcp_server", await mcpController.manage(command));
 			}
 
 			case "get_skills": {

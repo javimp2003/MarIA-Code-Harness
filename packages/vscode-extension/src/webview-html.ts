@@ -2,7 +2,11 @@ import { randomBytes } from "node:crypto";
 import * as vscode from "vscode";
 
 /** The HTML shell for a bundled webview (`dist/webview/<view>.js` + `.css`) under a strict CSP. */
-export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, view: "chat" | "settings"): string {
+export function webviewHtml(
+	webview: vscode.Webview,
+	extensionUri: vscode.Uri,
+	view: "chat" | "settings" | "mcp",
+): string {
 	const asset = (name: string) => webview.asWebviewUri(vscode.Uri.joinPath(extensionUri, "dist", "webview", name));
 	const nonce = randomBytes(16).toString("base64");
 	const csp = [
@@ -13,7 +17,7 @@ export function webviewHtml(webview: vscode.Webview, extensionUri: vscode.Uri, v
 		`script-src 'nonce-${nonce}'`,
 	].join("; ");
 	return `<!DOCTYPE html>
-<html lang="en">
+<html lang="${view === "mcp" ? "es" : "en"}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="${csp}">

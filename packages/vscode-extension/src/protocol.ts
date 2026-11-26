@@ -20,6 +20,8 @@ import type {
 	AvailableSlashCommand,
 	EnhancePromptResult,
 	ImageContent,
+	McpServers,
+	ManageMcpServerParams,
 	RpcAgentEvent,
 	SessionState,
 	ScopeCheckpointLevel,
@@ -44,6 +46,9 @@ export type {
 	CustomMessage,
 	EnhancePromptResult,
 	ImageContent,
+	McpServers,
+	McpServer,
+	ManageMcpServerParams,
 	RpcAgentEvent,
 	ScopeCheckpointLevel,
 	ScopeCheckpointStats,
@@ -460,6 +465,7 @@ export type ChatRequest =
 	/** Show a skill proposal's changes in a diff editor. */
 	| { type: "openSkillProposalDiff"; id: string }
 	| { type: "openSettings" }
+	| { type: "openMcp" }
 	| { type: "login" }
 	| { type: "compact" }
 	| { type: "restart" }
@@ -535,4 +541,13 @@ export type SettingsRequest =
 	/** `value` is passed verbatim to `omp config set <key> <value>` (arrays/records as JSON). */
 	| { type: "set"; key: string; value: string }
 	| { type: "reset"; key: string }
-	| { type: "openConfigFile" };
+	| { type: "openConfigFile" }
+	| { type: "openMcp" };
+
+export type McpRequest =
+	| { type: "ready" | "refresh" }
+	| { type: "manage"; requestId: number; params: ManageMcpServerParams }
+	| { type: "openConfig"; scope: "project" | "user" };
+export type McpUpdate =
+	| { type: "mcpState"; state: McpServers; folder: string; requestId?: number }
+	| { type: "mcpError"; message: string; requestId?: number };

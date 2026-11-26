@@ -58,6 +58,16 @@ Project-scoped MCP config (`.omp/mcp.json`) is keyed to the working directory, n
 
 MCP follows the same profile rules as the rest of OMP-native config; see [Configuration Discovery → Profiles](./config-usage.md#profiles).
 
+## VS Code visual configuration
+
+In MarIA Code, select the MCP mark in the chat header, **Servidores MCP** in Settings, or **MarIA Code: Servidores MCP** in the command palette. The panel belongs to the chat that opened it, including its folder and active profile.
+
+Choose **Añadir servidor**, fill in a remote HTTP/SSE URL or a local stdio command, and select project or user scope. Local arguments go one per line; blank lines are ignored and paths with spaces need no additional quotes. Optional credentials, HTTP headers and environment variables use form fields. **Guardar y conectar** writes the native MCP file and reloads the current chat's tools. Other running chats must reload or restart to apply the edit.
+
+The list shows connection status and tool counts. **Comprobar conexión** tests the saved configuration without changing it; **Activar**, **Desactivar** and **Eliminar** manage native entries. Imported entries are read-only. OAuth authorization is available from the terminal with `/mcp reauth <name>`. Changes wait until the chat is idle. Both the extension and the engine must include the visual MCP RPC commands.
+
+The form writes `envPolicy: "literal"` for local environment values and `headerPolicy: "origin-locked"` for remote headers. In native OMP config, these skip environment substitution and command evaluation for those values; origin-locked headers also stay on the configured endpoint's origin during redirects. Existing configurations without these fields keep their expansion behavior. Credentials remain in the chosen config file, so prefer user scope for values that should not be shared with a project.
+
 ## Add a schema reference
 
 Add this line at the top of the file for editor autocomplete and validation:

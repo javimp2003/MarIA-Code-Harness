@@ -1,0 +1,66 @@
+@import url("./settings.css");
+
+body { --omp-accent: #2bd125; --omp-accent-fg: #1a1a1a; }
+.mcp-app { overflow-y: auto; }
+.mcp-app .header { max-width: 1000px; width: 100%; margin: 0 auto; padding: 28px 28px 16px; }
+.mcp-heading { display: flex; align-items: center; gap: 14px; }
+.mcp-heading p { margin: 4px 0 0; }
+.mcp-mark, .empty-mark { display: grid; place-items: center; flex: none; color: var(--vscode-foreground); }
+.mcp-mark svg { width: 32px; height: 32px; }
+.mcp-content { width: 100%; max-width: 1000px; margin: 0 auto; padding: 0 28px 28px; }
+.context { display: flex; align-items: center; gap: 8px; padding-bottom: 20px; border-bottom: 1px solid var(--vscode-panel-border); }
+.context-folder { overflow-wrap: anywhere; }
+.section-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 20px 0 14px; }
+.section-toolbar h2 { margin: 0; }
+.server-count { margin-left: 4px; font-size: 0.7em; font-weight: 400; color: var(--vscode-descriptionForeground); }
+.mcp-app button { border-radius: 6px; min-height: 30px; }
+.mcp-app button:disabled { opacity: 0.5; cursor: default; }
+.mcp-app button.primary { display: inline-flex; gap: 6px; align-items: center; color: var(--omp-accent-fg); background: var(--omp-accent); font-weight: 600; }
+.mcp-app button.primary:hover:not(:disabled) { filter: brightness(0.92); }
+.server-list { display: grid; gap: 12px; }
+.server-card { border: 1px solid var(--vscode-panel-border); border-radius: 10px; padding: 16px; min-width: 0; }
+.server-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.server-title strong { overflow-wrap: anywhere; }
+.connection-status { margin-left: auto; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
+.connection-status::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: currentColor; margin-right: 6px; }
+.connection-status.connected { color: var(--vscode-testing-iconPassed, #57ab5a); }
+.connection-status.connecting { color: var(--vscode-editorWarning-foreground, #cca700); }
+.connection-status.disconnected { color: var(--vscode-errorForeground); }
+.server-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 6px; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
+.server-location { display: block; overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family); }
+.server-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 14px; }
+.mcp-app button.danger { color: var(--vscode-errorForeground); }
+.mcp-empty { text-align: center; padding: 36px 24px; border: 1px dashed var(--vscode-panel-border); border-radius: 10px; }
+.mcp-empty h3 { border: 0; margin: 12px 0 0; }
+.mcp-empty p { max-width: 430px; margin: 10px auto 18px; }
+.empty-mark svg { width: 36px; height: 36px; opacity: 0.7; }
+.server-form { margin-bottom: 18px; padding: 20px; border: 1px solid var(--vscode-focusBorder); border-radius: 10px; background: var(--vscode-editorWidget-background, var(--vscode-editor-background)); }
+.server-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+.server-form legend { padding: 0; font-weight: 600; font-size: 1.2em; }
+.field { display: flex; flex-direction: column; gap: 6px; margin: 16px 0; min-width: 0; }
+.field label { font-weight: 600; }
+.field input, .field select, .field textarea { width: 100%; border-radius: 4px; padding: 7px 8px; }
+.field textarea { resize: vertical; font-family: var(--vscode-editor-font-family); }
+.form-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.scope-path { overflow-wrap: anywhere; font-family: var(--vscode-editor-font-family); font-size: 0.95em; }
+.pair-editor { margin: 18px 0; }
+.pair-editor summary { cursor: pointer; margin-bottom: 10px; }
+.pair-row { display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; margin-bottom: 8px; }
+.pair-row input { width: 100%; }
+.form-actions { margin-top: 18px; }
+.mcp-notice { margin-top: 16px; padding: 10px 12px; border-radius: 6px; border: 1px solid currentColor; overflow-wrap: anywhere; }
+.mcp-notice.success { color: var(--vscode-testing-iconPassed, #57ab5a); }
+.mcp-footer { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--vscode-panel-border); }
+.config-links { display: flex; gap: 16px; flex-wrap: wrap; }
+.mcp-app .icon { vertical-align: middle; }
+@media (max-width: 560px) {
+ .mcp-app .header { padding: 18px 16px 12px; }
+ .mcp-content { padding: 0 16px 20px; }
+ .mcp-heading { gap: 10px; }
+ .mcp-app h1 { font-size: 1.35em; }
+ .form-columns { grid-template-columns: 1fr; gap: 0; }
+ .server-form { padding: 14px; }
+ .pair-row { grid-template-columns: 1fr auto; }
+ .pair-row input:first-child { grid-column: 1 / -1; }
+ .section-toolbar { flex-wrap: wrap; }
+}

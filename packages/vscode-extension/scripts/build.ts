@@ -24,7 +24,7 @@ if (!host.success) throw new AggregateError(host.logs, "extension host build fai
 
 const logo = await fs.readFile(path.join(root, "media", "maria-logo.png"));
 const logoDataUrl = `data:image/png;base64,${logo.toString("base64")}`;
-for (const view of ["chat", "settings"]) {
+for (const view of ["chat", "settings", "mcp"]) {
 	const result = await Bun.build({
 		entrypoints: [path.join(root, `webview/${view}/main.ts`)],
 		outdir: path.join(dist, "webview"),

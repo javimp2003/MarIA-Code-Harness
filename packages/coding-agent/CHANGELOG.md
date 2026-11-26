@@ -4,6 +4,8 @@
 
 ### Added
 
+- Added visual-host MCP management over RPC, with profile-aware configuration, connection checks and live tool reloads; credentials entered through the form remain literal.
+
 - Added RPC `enhance_prompt` / `enhance_prompt_cancel` ("Mejorar prompt"): one tool-less, unrecorded call proposes a faithful rewrite of a composer draft (clearer, better ordered, never wider in scope) with a change list and unresolved ambiguities, on the new `enhance` model role (unset, a configured `smol` role, else the session's model); a proposal that alters literal tokens of the draft (code, paths, URLs, `@mentions`, a leading `/command`) comes back `invalid`. On Unicaja's LiteLLM gateway these requests carry `"no-log": true`
 - Added RPC `ask_selection` / `ask_selection_cancel` with `ask_selection_delta` frames: quick questions about text selected in an answer, answered outside the session (nothing is recorded) on the new `ask` model role (`modelRoles.ask` in `config.yml`, with an optional `:level` thinking suffix; unset, the session's model). On Unicaja's LiteLLM gateway these requests carry `"no-log": true` too
 - Added RPC `get_skills`, `set_disabled_skills` and `reload_skills`: a host can list the session's skills, switch some off for that session only before its first prompt (they leave the system prompt, `/skill:` commands, `skill://` and its subagents, and stay off when the session is resumed), and rediscover skills after adding one

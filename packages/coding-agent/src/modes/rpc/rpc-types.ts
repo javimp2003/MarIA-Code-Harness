@@ -27,6 +27,7 @@ import type { GoalModeState } from "../../goals/state";
 import type { RpcGoalOp, RpcGoalResult } from "./rpc-goal";
 import type { RpcPlanModeState } from "./rpc-plan";
 import type { BtwHistoryRecord } from "../../session/btw-history";
+import type { RpcManageMcpServer, RpcMcpServers } from "./rpc-mcp";
 
 // ============================================================================
 // RPC Commands (stdin)
@@ -71,6 +72,8 @@ export type RpcCommand =
 	| { id?: string; type: "cancel_async_job"; jobId: string }
 	| { id?: string; type: "set_ask_dialog"; enabled: boolean }
 	| { id?: string; type: "get_available_commands" }
+	| { id?: string; type: "get_mcp_servers" }
+	| ({ id?: string; type: "manage_mcp_server" } & RpcManageMcpServer)
 	| { id?: string; type: "get_skills" }
 	| { id?: string; type: "set_disabled_skills"; names: string[] }
 	| { id?: string; type: "reload_skills" }
@@ -573,6 +576,8 @@ export type RpcResponse =
 			success: true;
 			data: { commands: RpcAvailableSlashCommand[] };
 	  }
+	| { id?: string; type: "response"; command: "get_mcp_servers"; success: true; data: RpcMcpServers }
+	| { id?: string; type: "response"; command: "manage_mcp_server"; success: true; data: RpcMcpServers }
 	| { id?: string; type: "response"; command: "get_skills"; success: true; data: RpcSessionSkills }
 	| { id?: string; type: "response"; command: "set_disabled_skills"; success: true; data: RpcSessionSkills }
 	| { id?: string; type: "response"; command: "reload_skills"; success: true; data: RpcSessionSkills }

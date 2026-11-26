@@ -18,18 +18,24 @@ const SENSITIVE_QUERY_PARAM = /key|token|secret|auth/i;
  * credential-bearing query params (e.g. `exaApiKey`) — so diagnostics never
  * write secrets to the persistent log file or the UI.
  */
-export function redactUrlForLog(url: string): string {
+export function redactUrlForLog(url: string, options?: { omitQuery?: boolean }): string {
 	try {
 		const parsed = new URL(url);
 		parsed.username = "";
 		parsed.password = "";
-		for (const name of parsed.searchParams.keys()) {
-			if (SENSITIVE_QUERY_PARAM.test(name)) parsed.searchParams.set(name, "[redacted]");
+		if (options?.omitQuery) {
+			parsed.search = "";
+			parsed.hash = "";
+		} else {
+			for (const name of parsed.searchParams.keys()) {
+				if (SENSITIVE_QUERY_PARAM.test(name)) parsed.searchParams.set(name, "[redacted]");
+			}
 		}
 		return parsed.toString();
 	} catch {
 		// Unparseable URL — drop the query string and any userinfo rather than risk leaking them.
-		return url.split("?")[0].replace(/^([^:/?#]+:\/\/)[^/@]*@/, "$1");
+		const safe = url.split("?")[0].replace(/^([^:/?#]+:\/\/)[^/@]*@/, "$1");
+		return options?.omitQuery ? safe.split("#")[0] : safe;
 	}
 }
 

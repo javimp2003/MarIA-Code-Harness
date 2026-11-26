@@ -1000,6 +1000,14 @@ Command discovery is intentionally an OMP dialect: Pi's `get_commands` (a
 not served because OMP's richer catalog (builtins/custom/MCP/file commands,
 broader `source` enum, no Pi `sourceInfo`) is not wire-compatible with it.
 
+### MCP servers
+
+`get_mcp_servers` returns `{ servers, projectConfigPath, userConfigPath, projectEnabled, busy }`. Each row includes its name, scope (`project`, `user`, or read-only `external`), config path, transport, redacted location, enabled state, connection status, tool count and optional reason for being inactive. Headers, environment values and command arguments are not returned.
+
+`manage_mcp_server` accepts `op: "add" | "remove" | "set_enabled" | "test" | "reload"`. Except for `reload`, provide `name` and `scope: "project" | "user"`. `add` also takes `transport: "http" | "sse" | "stdio"` and the relevant `url`, `headers`, `command`, `args`, `env`, and `cwd` fields. `set_enabled` takes `enabled`. Paths follow the current project and active profile; clients cannot supply arbitrary config paths. Duplicate names in the same file fail without overwriting the entry.
+
+The response is the refreshed server snapshot, with optional `message` and `warning`. Writes reload live tools with the same filters as startup; a saved configuration is reported as saved even if runtime reload fails. `test` opens and closes a separate connection to the saved configuration and reports its tool count. Operations reject while the session streams or compacts, or while another MCP operation runs. OAuth authorization remains in the terminal. SDK hosts must pass the session's `mcpManager` in `runRpcMode` options to enable mutations; no process-global manager is borrowed.
+
 ### Session skills
 
 `get_skills`, `set_disabled_skills` and `reload_skills` return

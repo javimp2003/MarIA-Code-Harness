@@ -980,6 +980,30 @@ class AsyncJob:
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
+class McpServer:
+    name: str
+    scope: Literal["project", "user", "external"]
+    config_path: str
+    type: str
+    location: str
+    enabled: bool
+    status: Literal["connected", "connecting", "disconnected", "disabled", "inactive"]
+    tools: float
+    reason: str | None = None
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
+class McpServers:
+    servers: tuple[McpServer, ...]
+    project_config_path: str
+    user_config_path: str
+    project_enabled: bool
+    busy: bool
+    message: str | None = None
+    warning: str | None = None
+
+
+@dataclass(slots=True, frozen=True, kw_only=True)
 class SessionSkill:
     """One skill discovered for the session."""
     name: str
@@ -2459,6 +2483,34 @@ def parse_async_job(value: object, path: str = "AsyncJob") -> AsyncJob:
     )
 
 
+def parse_mcp_server(value: object, path: str = "McpServer") -> McpServer:
+    payload = expect_object(value, path)
+    return McpServer(
+        name=required(payload, "name", decode_str, path),
+        scope=required(payload, "scope", cast('Decoder[Literal["project", "user", "external"]]', literal(frozenset({"project", "user", "external"}))), path),
+        config_path=required(payload, "configPath", decode_str, path),
+        type=required(payload, "type", decode_str, path),
+        location=required(payload, "location", decode_str, path),
+        enabled=required(payload, "enabled", decode_bool, path),
+        status=required(payload, "status", cast('Decoder[Literal["connected", "connecting", "disconnected", "disabled", "inactive"]]', literal(frozenset({"connected", "connecting", "disconnected", "disabled", "inactive"}))), path),
+        tools=required(payload, "tools", decode_float, path),
+        reason=optional(payload, "reason", decode_str, path),
+    )
+
+
+def parse_mcp_servers(value: object, path: str = "McpServers") -> McpServers:
+    payload = expect_object(value, path)
+    return McpServers(
+        servers=required(payload, "servers", array(parse_mcp_server), path),
+        project_config_path=required(payload, "projectConfigPath", decode_str, path),
+        user_config_path=required(payload, "userConfigPath", decode_str, path),
+        project_enabled=required(payload, "projectEnabled", decode_bool, path),
+        busy=required(payload, "busy", decode_bool, path),
+        message=optional(payload, "message", decode_str, path),
+        warning=optional(payload, "warning", decode_str, path),
+    )
+
+
 def parse_session_skill(value: object, path: str = "SessionSkill") -> SessionSkill:
     payload = expect_object(value, path)
     return SessionSkill(
@@ -3613,6 +3665,37 @@ class WireClient:
         params: dict[str, object] = {}
         return required(expect_object(self._command("get_available_commands", params), "get_available_commands"), "commands", array(parse_available_slash_command), "get_available_commands")
 
+    def get_mcp_servers(self) -> McpServers:
+        """List configured MCP servers and connection status without exposing credentials."""
+        params: dict[str, object] = {}
+        return parse_mcp_servers(self._command("get_mcp_servers", params), "get_mcp_servers")
+
+    def manage_mcp_server(self, op: Literal["add", "remove", "set_enabled", "test", "reload"], *, name: str | None = None, scope: Literal["project", "user"] | None = None, transport: Literal["http", "stdio", "sse"] | None = None, url: str | None = None, headers: dict[str, str] | None = None, command: str | None = None, args: Sequence[str] | None = None, env: dict[str, str] | None = None, cwd: str | None = None, enabled: bool | None = None) -> McpServers:
+        """Add, remove, enable, test or reload MCP servers in the current profile and project; mutations require an idle session."""
+        params: dict[str, object] = {}
+        params["op"] = op
+        if name is not None:
+            params["name"] = name
+        if scope is not None:
+            params["scope"] = scope
+        if transport is not None:
+            params["transport"] = transport
+        if url is not None:
+            params["url"] = url
+        if headers is not None:
+            params["headers"] = headers
+        if command is not None:
+            params["command"] = command
+        if args is not None:
+            params["args"] = list(args)
+        if env is not None:
+            params["env"] = env
+        if cwd is not None:
+            params["cwd"] = cwd
+        if enabled is not None:
+            params["enabled"] = enabled
+        return parse_mcp_servers(self._command("manage_mcp_server", params, timeout=60), "manage_mcp_server")
+
     def get_skills(self) -> SessionSkills:
         """List the session's skills, switched-off ones included, and whether they can still be switched off."""
         params: dict[str, object] = {}
@@ -4326,6 +4409,8 @@ __all__ = [
     "LoginProvider",
     "LogoutAccount",
     "LogoutResult",
+    "McpServer",
+    "McpServers",
     "MessageContent",
     "MessageEndEvent",
     "MessageStartEvent",
@@ -4520,6 +4605,8 @@ __all__ = [
     "parse_login_provider",
     "parse_logout_account",
     "parse_logout_result",
+    "parse_mcp_server",
+    "parse_mcp_servers",
     "parse_message_end_event",
     "parse_message_start_event",
     "parse_message_update_event",

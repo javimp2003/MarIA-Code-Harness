@@ -219,6 +219,28 @@
 				"clientOmit": []
 			},
 			{
+				"name": "get_mcp_servers",
+				"doc": "List configured MCP servers and connection status without exposing credentials.",
+				"params": null,
+				"result": "McpServers",
+				"nullable": false,
+				"unwrap": null,
+				"timeoutMs": null,
+				"completion": null,
+				"clientOmit": []
+			},
+			{
+				"name": "manage_mcp_server",
+				"doc": "Add, remove, enable, test or reload MCP servers in the current profile and project; mutations require an idle session.",
+				"params": "ManageMcpServerParams",
+				"result": "McpServers",
+				"nullable": false,
+				"unwrap": null,
+				"timeoutMs": 60000,
+				"completion": null,
+				"clientOmit": []
+			},
+			{
 				"name": "get_skills",
 				"doc": "List the session's skills, switched-off ones included, and whether they can still be switched off.",
 				"params": null,
@@ -3669,6 +3691,96 @@
 			],
 			"description": "One background job of the session."
 		},
+		"McpServer": {
+			"type": "object",
+			"properties": {
+				"name": {
+					"type": "string"
+				},
+				"scope": {
+					"enum": [
+						"project",
+						"user",
+						"external"
+					],
+					"type": "string"
+				},
+				"configPath": {
+					"type": "string"
+				},
+				"type": {
+					"type": "string"
+				},
+				"location": {
+					"type": "string"
+				},
+				"enabled": {
+					"type": "boolean"
+				},
+				"status": {
+					"enum": [
+						"connected",
+						"connecting",
+						"disconnected",
+						"disabled",
+						"inactive"
+					],
+					"type": "string"
+				},
+				"tools": {
+					"type": "number"
+				},
+				"reason": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"name",
+				"scope",
+				"configPath",
+				"type",
+				"location",
+				"enabled",
+				"status",
+				"tools"
+			]
+		},
+		"McpServers": {
+			"type": "object",
+			"properties": {
+				"servers": {
+					"type": "array",
+					"items": {
+						"$ref": "#/$defs/McpServer"
+					}
+				},
+				"projectConfigPath": {
+					"type": "string"
+				},
+				"userConfigPath": {
+					"type": "string"
+				},
+				"projectEnabled": {
+					"type": "boolean"
+				},
+				"busy": {
+					"type": "boolean"
+				},
+				"message": {
+					"type": "string"
+				},
+				"warning": {
+					"type": "string"
+				}
+			},
+			"required": [
+				"servers",
+				"projectConfigPath",
+				"userConfigPath",
+				"projectEnabled",
+				"busy"
+			]
+		},
 		"SessionSkill": {
 			"type": "object",
 			"properties": {
@@ -6668,6 +6780,74 @@
 			},
 			"required": [
 				"commands"
+			]
+		},
+		"ManageMcpServerParams": {
+			"type": "object",
+			"properties": {
+				"op": {
+					"enum": [
+						"add",
+						"remove",
+						"set_enabled",
+						"test",
+						"reload"
+					],
+					"type": "string"
+				},
+				"name": {
+					"type": "string"
+				},
+				"scope": {
+					"enum": [
+						"project",
+						"user"
+					],
+					"type": "string"
+				},
+				"transport": {
+					"enum": [
+						"http",
+						"stdio",
+						"sse"
+					],
+					"type": "string"
+				},
+				"url": {
+					"type": "string"
+				},
+				"headers": {
+					"type": "object",
+					"properties": {},
+					"additionalProperties": {
+						"type": "string"
+					}
+				},
+				"command": {
+					"type": "string"
+				},
+				"args": {
+					"type": "array",
+					"items": {
+						"type": "string"
+					}
+				},
+				"env": {
+					"type": "object",
+					"properties": {},
+					"additionalProperties": {
+						"type": "string"
+					}
+				},
+				"cwd": {
+					"type": "string"
+				},
+				"enabled": {
+					"type": "boolean"
+				}
+			},
+			"required": [
+				"op"
 			]
 		},
 		"SetDisabledSkillsParams": {

@@ -6,6 +6,7 @@
 import type { SettingEntry, SettingsRequest, SettingsUpdate } from "../../src/protocol";
 import { getVsCodeApi } from "../vscode-api";
 import { h } from "../dom";
+import { icon } from "../icons";
 import { CONTROL_CLASS, createCheckbox, createEditor, type EditorCallbacks } from "./editors";
 import { advancedGroup, groupEntries, isModified, listTabs, matchesSearch, tabLabel, tabOf } from "./model";
 
@@ -33,6 +34,8 @@ const rows = new Map<string, HTMLElement>();
 
 const configPathEl = h("span", { className: "config-path" });
 const openConfigButton = h("button", { className: "secondary", textContent: "Open config.yml" });
+const mcpButton = h("button", { className: "secondary" }, icon("mcp"), " Servidores MCP");
+mcpButton.addEventListener("click", () => vscode.postMessage({ type: "openMcp" }));
 const refreshButton = h("button", { className: "secondary", textContent: "Refresh" });
 const bannerText = h("span");
 const bannerClose = h("button", { className: "icon", textContent: "×", title: "Dismiss" });
@@ -59,7 +62,7 @@ document
 				"header",
 				{ className: "header" },
 				h("div", { className: "title" }, h("h1", { textContent: "MarIA Code Settings" }), configPathEl),
-				h("div", { className: "actions" }, openConfigButton, refreshButton),
+				h("div", { className: "actions" }, mcpButton, openConfigButton, refreshButton),
 			),
 			banner,
 			h(

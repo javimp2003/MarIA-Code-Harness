@@ -179,6 +179,10 @@
             "cwd": {
               "type": "string",
               "description": "Working directory used when spawning the stdio process."
+            },
+            "envPolicy": {
+              "const": "literal",
+              "description": "Keep environment values literal, without variable expansion or command evaluation (native OMP config)."
             }
           },
           "not": {
@@ -216,6 +220,10 @@
             "headers": {
               "$ref": "#/$defs/stringMap",
               "description": "HTTP headers sent with MCP requests."
+            },
+            "headerPolicy": {
+              "const": "origin-locked",
+              "description": "Keep headers literal and send configured credentials only to this endpoint origin (native OMP config)."
             }
           },
           "not": {
@@ -253,6 +261,10 @@
             "headers": {
               "$ref": "#/$defs/stringMap",
               "description": "HTTP headers sent with the SSE transport."
+            },
+            "headerPolicy": {
+              "const": "origin-locked",
+              "description": "Keep headers literal and send configured credentials only to this endpoint origin (native OMP config)."
             }
           },
           "not": {

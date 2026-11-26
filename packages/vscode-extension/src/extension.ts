@@ -8,6 +8,7 @@ import type { ChatSession } from "./chat/chat-session";
 import { ChatRegistry } from "./chat/chat-views";
 import { formatWorkspaceMention } from "./chat/workspace-mentions";
 import { agentDir, readConfig, workspaceCwd } from "./config";
+import { McpPanel } from "./mcp/mcp-panel";
 import { ChangeViewer } from "./editor-changes/change-viewer";
 import { bindNoWorkspaceState } from "./no-workspace";
 import { renameStoredSession } from "./sessions/rename";
@@ -39,6 +40,9 @@ export function activate(context: vscode.ExtensionContext): void {
 		log,
 		{
 			openSettings: () => SettingsPanel.show(context.extensionUri),
+			openMcp: session => {
+				if (session.host) McpPanel.show(context.extensionUri, session.host);
+			},
 			login: session => void login(session),
 			attachFiles: session => void attachFiles(session),
 			deleteSession: (sessionFile, label) => deleteSession(sessionFile, label),
@@ -303,6 +307,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	context.subscriptions.push(
 		log,
+		{ dispose: () => McpPanel.close() },
 		tree,
 		skillsTree,
 		chats,
@@ -369,6 +374,13 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand(
 			"ompCustom.openSettings",
 			run(() => SettingsPanel.show(context.extensionUri)),
+		),
+		vscode.commands.registerCommand(
+			"ompCustom.openMcp",
+			run(async () => {
+				const session = await activeChat();
+				if (session?.host) McpPanel.show(context.extensionUri, session.host);
+			}),
 		),
 		vscode.commands.registerCommand("ompCustom.openConfigFile", run(openConfigFile)),
 		vscode.commands.registerCommand(

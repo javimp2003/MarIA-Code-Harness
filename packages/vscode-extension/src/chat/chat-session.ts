@@ -81,6 +81,7 @@ export class ChatSession implements vscode.Disposable, HostView {
 		/** Commands the webview can trigger that live outside this session. */
 		readonly commands: {
 			openSettings(): void;
+			openMcp(session: ChatSession): void;
 			login(session: ChatSession): void;
 			attachFiles(session: ChatSession): void;
 			/** Asks for confirmation; resolves once the session is deleted or the user declined. */
@@ -671,6 +672,9 @@ export class ChatSession implements vscode.Disposable, HostView {
 				return;
 			case "watchSubagent":
 				this.#host?.watchSubagent(request.id);
+				return;
+			case "openMcp":
+				this.commands.openMcp(this);
 				return;
 			case "openSettings":
 				this.commands.openSettings();

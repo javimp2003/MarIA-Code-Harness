@@ -3410,6 +3410,116 @@ func (v *AsyncJob) decodeFrom(raw map[string]json.RawMessage) error {
 	return nil
 }
 
+type McpServer struct {
+	Name       string          `json:"name"`
+	Scope      McpServerScope  `json:"scope"`
+	ConfigPath string          `json:"configPath"`
+	Type       string          `json:"type"`
+	Location   string          `json:"location"`
+	Enabled    bool            `json:"enabled"`
+	Status     McpServerStatus `json:"status"`
+	Tools      float64         `json:"tools"`
+	Reason     *string         `json:"reason,omitempty"`
+}
+
+func (v *McpServer) UnmarshalJSON(data []byte) error {
+	return decodeWith(data, "McpServer", v.decodeFrom)
+}
+
+func (v *McpServer) decodeFrom(raw map[string]json.RawMessage) error {
+	var out McpServer
+	d := fieldDecoder{raw: raw, owner: "McpServer"}
+	d.required("name", &out.Name)
+	d.required("scope", &out.Scope)
+	d.required("configPath", &out.ConfigPath)
+	d.required("type", &out.Type)
+	d.required("location", &out.Location)
+	d.required("enabled", &out.Enabled)
+	d.required("status", &out.Status)
+	d.required("tools", &out.Tools)
+	d.optional("reason", &out.Reason)
+	if d.err != nil {
+		return d.err
+	}
+	*v = out
+	return nil
+}
+
+type McpServerScope string
+
+const (
+	McpServerScopeProject  McpServerScope = "project"
+	McpServerScopeUser     McpServerScope = "user"
+	McpServerScopeExternal McpServerScope = "external"
+)
+
+func (v *McpServerScope) UnmarshalJSON(data []byte) error {
+	s, err := decodeString(data, "McpServerScope")
+	if err != nil {
+		return err
+	}
+	switch value := McpServerScope(s); value {
+	case McpServerScopeProject, McpServerScopeUser, McpServerScopeExternal:
+		*v = value
+		return nil
+	}
+	return unknownValue("McpServerScope", s)
+}
+
+type McpServerStatus string
+
+const (
+	McpServerStatusConnected    McpServerStatus = "connected"
+	McpServerStatusConnecting   McpServerStatus = "connecting"
+	McpServerStatusDisconnected McpServerStatus = "disconnected"
+	McpServerStatusDisabled     McpServerStatus = "disabled"
+	McpServerStatusInactive     McpServerStatus = "inactive"
+)
+
+func (v *McpServerStatus) UnmarshalJSON(data []byte) error {
+	s, err := decodeString(data, "McpServerStatus")
+	if err != nil {
+		return err
+	}
+	switch value := McpServerStatus(s); value {
+	case McpServerStatusConnected, McpServerStatusConnecting, McpServerStatusDisconnected, McpServerStatusDisabled, McpServerStatusInactive:
+		*v = value
+		return nil
+	}
+	return unknownValue("McpServerStatus", s)
+}
+
+type McpServers struct {
+	Servers           []McpServer `json:"servers"`
+	ProjectConfigPath string      `json:"projectConfigPath"`
+	UserConfigPath    string      `json:"userConfigPath"`
+	ProjectEnabled    bool        `json:"projectEnabled"`
+	Busy              bool        `json:"busy"`
+	Message           *string     `json:"message,omitempty"`
+	Warning           *string     `json:"warning,omitempty"`
+}
+
+func (v *McpServers) UnmarshalJSON(data []byte) error {
+	return decodeWith(data, "McpServers", v.decodeFrom)
+}
+
+func (v *McpServers) decodeFrom(raw map[string]json.RawMessage) error {
+	var out McpServers
+	d := fieldDecoder{raw: raw, owner: "McpServers"}
+	d.required("servers", &out.Servers)
+	d.required("projectConfigPath", &out.ProjectConfigPath)
+	d.required("userConfigPath", &out.UserConfigPath)
+	d.required("projectEnabled", &out.ProjectEnabled)
+	d.required("busy", &out.Busy)
+	d.optional("message", &out.Message)
+	d.optional("warning", &out.Warning)
+	if d.err != nil {
+		return d.err
+	}
+	*v = out
+	return nil
+}
+
 // One skill discovered for the session.
 type SessionSkill struct {
 	// Name the skill is invoked by (`/skill:<name>`, `skill://<name>`).
@@ -8271,6 +8381,99 @@ func (c Commands) GetAvailableCommands(ctx context.Context) ([]AvailableSlashCom
 	var out GetAvailableCommandsResult
 	err := c.call(ctx, "get_available_commands", nil, 0, &out)
 	return out.Commands, err
+}
+
+// GetMcpServers sends "get_mcp_servers": List configured MCP servers and connection status without exposing credentials.
+func (c Commands) GetMcpServers(ctx context.Context) (McpServers, error) {
+	var out McpServers
+	err := c.call(ctx, "get_mcp_servers", nil, 0, &out)
+	return out, err
+}
+
+// ManageMcpServerCommand holds the parameters of "manage_mcp_server".
+type ManageMcpServerCommand struct {
+	Op        ManageMcpServerCommandOp         `json:"op"`
+	Name      *string                          `json:"name,omitempty"`
+	Scope     *ManageMcpServerCommandScope     `json:"scope,omitempty"`
+	Transport *ManageMcpServerCommandTransport `json:"transport,omitempty"`
+	URL       *string                          `json:"url,omitempty"`
+	Headers   map[string]string                `json:"headers,omitempty"`
+	Command   *string                          `json:"command,omitempty"`
+	Args      []string                         `json:"args,omitempty"`
+	Env       map[string]string                `json:"env,omitempty"`
+	Cwd       *string                          `json:"cwd,omitempty"`
+	Enabled   *bool                            `json:"enabled,omitempty"`
+}
+
+// ManageMcpServer sends "manage_mcp_server": Add, remove, enable, test or reload MCP servers in the current profile and project; mutations require an idle session.
+func (c Commands) ManageMcpServer(ctx context.Context, p ManageMcpServerCommand) (McpServers, error) {
+	var out McpServers
+	err := c.call(ctx, "manage_mcp_server", p, 60*time.Second, &out)
+	return out, err
+}
+
+type ManageMcpServerCommandOp string
+
+const (
+	ManageMcpServerCommandOpAdd        ManageMcpServerCommandOp = "add"
+	ManageMcpServerCommandOpRemove     ManageMcpServerCommandOp = "remove"
+	ManageMcpServerCommandOpSetEnabled ManageMcpServerCommandOp = "set_enabled"
+	ManageMcpServerCommandOpTest       ManageMcpServerCommandOp = "test"
+	ManageMcpServerCommandOpReload     ManageMcpServerCommandOp = "reload"
+)
+
+func (v *ManageMcpServerCommandOp) UnmarshalJSON(data []byte) error {
+	s, err := decodeString(data, "ManageMcpServerCommandOp")
+	if err != nil {
+		return err
+	}
+	switch value := ManageMcpServerCommandOp(s); value {
+	case ManageMcpServerCommandOpAdd, ManageMcpServerCommandOpRemove, ManageMcpServerCommandOpSetEnabled, ManageMcpServerCommandOpTest, ManageMcpServerCommandOpReload:
+		*v = value
+		return nil
+	}
+	return unknownValue("ManageMcpServerCommandOp", s)
+}
+
+type ManageMcpServerCommandScope string
+
+const (
+	ManageMcpServerCommandScopeProject ManageMcpServerCommandScope = "project"
+	ManageMcpServerCommandScopeUser    ManageMcpServerCommandScope = "user"
+)
+
+func (v *ManageMcpServerCommandScope) UnmarshalJSON(data []byte) error {
+	s, err := decodeString(data, "ManageMcpServerCommandScope")
+	if err != nil {
+		return err
+	}
+	switch value := ManageMcpServerCommandScope(s); value {
+	case ManageMcpServerCommandScopeProject, ManageMcpServerCommandScopeUser:
+		*v = value
+		return nil
+	}
+	return unknownValue("ManageMcpServerCommandScope", s)
+}
+
+type ManageMcpServerCommandTransport string
+
+const (
+	ManageMcpServerCommandTransportHTTP  ManageMcpServerCommandTransport = "http"
+	ManageMcpServerCommandTransportStdio ManageMcpServerCommandTransport = "stdio"
+	ManageMcpServerCommandTransportSse   ManageMcpServerCommandTransport = "sse"
+)
+
+func (v *ManageMcpServerCommandTransport) UnmarshalJSON(data []byte) error {
+	s, err := decodeString(data, "ManageMcpServerCommandTransport")
+	if err != nil {
+		return err
+	}
+	switch value := ManageMcpServerCommandTransport(s); value {
+	case ManageMcpServerCommandTransportHTTP, ManageMcpServerCommandTransportStdio, ManageMcpServerCommandTransportSse:
+		*v = value
+		return nil
+	}
+	return unknownValue("ManageMcpServerCommandTransport", s)
 }
 
 // GetSkills sends "get_skills": List the session's skills, switched-off ones included, and whether they can still be switched off.

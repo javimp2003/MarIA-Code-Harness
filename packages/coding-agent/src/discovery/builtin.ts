@@ -4,7 +4,14 @@
  * Primary provider for OMP native configs. Supports all capabilities.
  */
 import * as path from "node:path";
-import { getAgentDir, logger, normalizePathForComparison, parseFrontmatter, tryParseJson } from "@oh-my-pi/pi-utils";
+import {
+	getAgentDir,
+	isRecord,
+	logger,
+	normalizePathForComparison,
+	parseFrontmatter,
+	tryParseJson,
+} from "@oh-my-pi/pi-utils";
 import { YAML } from "bun";
 import { getManagedSkillsDir, MANAGED_SKILLS_PROVIDER_ID } from "../autolearn/managed-skills";
 import { registerProvider } from "../capability";
@@ -131,9 +138,12 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 		const data = tryParseJson<{ mcpServers?: Record<string, unknown> }>(content);
 		if (!data?.mcpServers) return result;
 
-		const expanded = expandEnvVarsDeep(data.mcpServers);
-		for (const [serverName, config] of Object.entries(expanded)) {
-			const serverConfig = config as Record<string, unknown>;
+		for (const [serverName, config] of Object.entries(data.mcpServers)) {
+			if (!isRecord(config)) continue;
+			const serverConfig = expandEnvVarsDeep(config);
+			// Visual configuration stores literal values; preserve them through both discovery and auth preparation.
+			if (config.envPolicy === "literal") serverConfig.env = config.env;
+			if (config.headerPolicy === "origin-locked") serverConfig.headers = config.headers;
 
 			// Validate enabled: coerce string "true"/"false", warn on other types
 			let enabled: boolean | undefined;
@@ -202,9 +212,11 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 				command: serverConfig.command as string | undefined,
 				args: serverConfig.args as string[] | undefined,
 				env: serverConfig.env as Record<string, string> | undefined,
+				envPolicy: serverConfig.envPolicy === "literal" ? "literal" : undefined,
 				cwd: serverConfig.cwd as string | undefined,
 				url: serverConfig.url as string | undefined,
 				headers: serverConfig.headers as Record<string, string> | undefined,
+				headerPolicy: serverConfig.headerPolicy === "origin-locked" ? "origin-locked" : undefined,
 				auth: serverConfig.auth as
 					| {
 							type: "oauth" | "apikey";

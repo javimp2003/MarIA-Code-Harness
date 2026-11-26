@@ -110,6 +110,9 @@ export class SettingsPanel implements vscode.Disposable {
 				}
 				return;
 			}
+			case "openMcp":
+				await vscode.commands.executeCommand("ompCustom.openMcp");
+				return;
 			case "openConfigFile":
 				await openConfigFile();
 				return;

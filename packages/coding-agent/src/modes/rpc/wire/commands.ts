@@ -131,6 +131,31 @@ export const rpcCommands: readonly RpcCommandSpec[] = [
 		unwrap: "commands",
 	},
 	{
+		name: "get_mcp_servers",
+		doc: "List configured MCP servers and connection status without exposing credentials.",
+		result: "McpServers",
+	},
+	{
+		name: "manage_mcp_server",
+		doc: "Add, remove, enable, test or reload MCP servers in the current profile and project; mutations require an idle session.",
+		params: {
+			op: "'add' | 'remove' | 'set_enabled' | 'test' | 'reload'",
+			"name?": "string",
+			"scope?": "'project' | 'user'",
+			"transport?": "'http' | 'stdio' | 'sse'",
+			"url?": "string",
+			"headers?": { "[string]": "string" },
+			"command?": "string",
+			"args?": "string[]",
+			"env?": { "[string]": "string" },
+			"cwd?": "string",
+			"enabled?": "boolean",
+		},
+		result: "McpServers",
+		timeoutMs: 60000,
+	},
+
+	{
 		name: "get_skills",
 		doc: "List the session's skills, switched-off ones included, and whether they can still be switched off.",
 		result: "SessionSkills",

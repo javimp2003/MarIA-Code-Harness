@@ -2565,6 +2565,7 @@ export async function runRootCommand(
 				stopStartupWatchdog();
 				logger.endTiming();
 				await runRpcMode(session, {
+					mcpManager,
 					setToolUIContext: mode === "rpc-ui" ? setToolUIContext : undefined,
 					headless: parsedArgs.noUi === true,
 					subagentEventBus,

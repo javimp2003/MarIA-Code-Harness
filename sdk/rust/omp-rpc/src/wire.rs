@@ -3531,6 +3531,37 @@ pub struct AsyncJob {
 	pub output: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct McpServer {
+	pub name: String,
+	pub scope: McpServerScope,
+	#[serde(rename = "configPath")]
+	pub config_path: String,
+	pub r#type: String,
+	pub location: String,
+	pub enabled: bool,
+	pub status: McpServerStatus,
+	pub tools: f64,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub reason: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct McpServers {
+	pub servers: Vec<McpServer>,
+	#[serde(rename = "projectConfigPath")]
+	pub project_config_path: String,
+	#[serde(rename = "userConfigPath")]
+	pub user_config_path: String,
+	#[serde(rename = "projectEnabled")]
+	pub project_enabled: bool,
+	pub busy: bool,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub message: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub warning: Option<String>,
+}
+
 /// One skill discovered for the session.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SessionSkill {
@@ -5448,6 +5479,31 @@ pub struct GetAvailableCommandsResult {
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ManageMcpServerParams {
+	pub op: ManageMcpServerParamsOp,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub name: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub scope: Option<ManageMcpServerParamsScope>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub transport: Option<ManageMcpServerParamsTransport>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub url: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub headers: Option<BTreeMap<String, String>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub command: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub args: Option<Vec<String>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub env: Option<BTreeMap<String, String>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub cwd: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub enabled: Option<bool>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SetDisabledSkillsParams {
 	pub names: Vec<String>,
 }
@@ -6156,6 +6212,54 @@ impl<'de> Deserialize<'de> for LitCompleted {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum McpServerScope {
+	#[serde(rename = "project")]
+	Project,
+	#[serde(rename = "user")]
+	User,
+	#[serde(rename = "external")]
+	External,
+}
+
+impl McpServerScope {
+	/// Wire value.
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Project => "project",
+			Self::User => "user",
+			Self::External => "external",
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum McpServerStatus {
+	#[serde(rename = "connected")]
+	Connected,
+	#[serde(rename = "connecting")]
+	Connecting,
+	#[serde(rename = "disconnected")]
+	Disconnected,
+	#[serde(rename = "disabled")]
+	Disabled,
+	#[serde(rename = "inactive")]
+	Inactive,
+}
+
+impl McpServerStatus {
+	/// Wire value.
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Connected => "connected",
+			Self::Connecting => "connecting",
+			Self::Disconnected => "disconnected",
+			Self::Disabled => "disabled",
+			Self::Inactive => "inactive",
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LogoutAccountType {
 	#[serde(rename = "api_key")]
 	ApiKey,
@@ -6229,6 +6333,72 @@ impl HostUriResultContentType {
 			Self::TextMarkdown => "text/markdown",
 			Self::ApplicationJson => "application/json",
 			Self::TextPlain => "text/plain",
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ManageMcpServerParamsOp {
+	#[serde(rename = "add")]
+	Add,
+	#[serde(rename = "remove")]
+	Remove,
+	#[serde(rename = "set_enabled")]
+	SetEnabled,
+	#[serde(rename = "test")]
+	Test,
+	#[serde(rename = "reload")]
+	Reload,
+}
+
+impl ManageMcpServerParamsOp {
+	/// Wire value.
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Add => "add",
+			Self::Remove => "remove",
+			Self::SetEnabled => "set_enabled",
+			Self::Test => "test",
+			Self::Reload => "reload",
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ManageMcpServerParamsScope {
+	#[serde(rename = "project")]
+	Project,
+	#[serde(rename = "user")]
+	User,
+}
+
+impl ManageMcpServerParamsScope {
+	/// Wire value.
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Project => "project",
+			Self::User => "user",
+		}
+	}
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ManageMcpServerParamsTransport {
+	#[serde(rename = "http")]
+	Http,
+	#[serde(rename = "stdio")]
+	Stdio,
+	#[serde(rename = "sse")]
+	Sse,
+}
+
+impl ManageMcpServerParamsTransport {
+	/// Wire value.
+	pub fn as_str(self) -> &'static str {
+		match self {
+			Self::Http => "http",
+			Self::Stdio => "stdio",
+			Self::Sse => "sse",
 		}
 	}
 }
@@ -6678,6 +6848,56 @@ impl Command for GetAvailableCommandsCommand {
 
 	fn decode(data: Option<Value>) -> Result<Self::Output, serde_json::Error> {
 		serde_json::from_value::<GetAvailableCommandsResult>(data.unwrap_or_else(|| Value::Object(Map::new()))).map(|result| result.commands)
+	}
+}
+
+/// List configured MCP servers and connection status without exposing credentials.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+pub struct GetMcpServersCommand {}
+
+impl Command for GetMcpServersCommand {
+	const NAME: &'static str = "get_mcp_servers";
+	const TIMEOUT_MS: Option<u64> = None;
+	type Output = McpServers;
+
+	fn decode(data: Option<Value>) -> Result<Self::Output, serde_json::Error> {
+		serde_json::from_value::<McpServers>(data.unwrap_or_else(|| Value::Object(Map::new())))
+	}
+}
+
+/// Add, remove, enable, test or reload MCP servers in the current profile and project; mutations require an idle session.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ManageMcpServerCommand {
+	pub op: ManageMcpServerParamsOp,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub name: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub scope: Option<ManageMcpServerParamsScope>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub transport: Option<ManageMcpServerParamsTransport>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub url: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub headers: Option<BTreeMap<String, String>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub command: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub args: Option<Vec<String>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub env: Option<BTreeMap<String, String>>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub cwd: Option<String>,
+	#[serde(default, skip_serializing_if = "Option::is_none")]
+	pub enabled: Option<bool>,
+}
+
+impl Command for ManageMcpServerCommand {
+	const NAME: &'static str = "manage_mcp_server";
+	const TIMEOUT_MS: Option<u64> = Some(60000);
+	type Output = McpServers;
+
+	fn decode(data: Option<Value>) -> Result<Self::Output, serde_json::Error> {
+		serde_json::from_value::<McpServers>(data.unwrap_or_else(|| Value::Object(Map::new())))
 	}
 }
 

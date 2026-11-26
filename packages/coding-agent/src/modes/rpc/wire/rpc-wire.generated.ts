@@ -774,6 +774,28 @@ export interface AsyncJob {
 	output?: string;
 }
 
+export interface McpServer {
+	name: string;
+	scope: "project" | "user" | "external";
+	configPath: string;
+	type: string;
+	location: string;
+	enabled: boolean;
+	status: "connected" | "connecting" | "disconnected" | "disabled" | "inactive";
+	tools: number;
+	reason?: string;
+}
+
+export interface McpServers {
+	servers: McpServer[];
+	projectConfigPath: string;
+	userConfigPath: string;
+	projectEnabled: boolean;
+	busy: boolean;
+	message?: string;
+	warning?: string;
+}
+
 /** One skill discovered for the session. */
 export interface SessionSkill {
 	/** Name the skill is invoked by (`/skill:<name>`, `skill://<name>`). */
@@ -1696,6 +1718,20 @@ export interface GetAvailableCommandsResult {
 	commands: AvailableSlashCommand[];
 }
 
+export interface ManageMcpServerParams {
+	op: "add" | "remove" | "set_enabled" | "test" | "reload";
+	name?: string;
+	scope?: "project" | "user";
+	transport?: "http" | "stdio" | "sse";
+	url?: string;
+	headers?: Record<string, string>;
+	command?: string;
+	args?: string[];
+	env?: Record<string, string>;
+	cwd?: string;
+	enabled?: boolean;
+}
+
 export interface SetDisabledSkillsParams {
 	names: string[];
 }
@@ -2074,6 +2110,8 @@ export interface RpcWireCommands {
 	set_delegate_mode: { params: SetDelegateModeParams; result: SetDelegateModeResult };
 	set_ask_dialog: { params: SetAskDialogParams; result: SetAskDialogResult };
 	get_available_commands: { params: undefined; result: GetAvailableCommandsResult };
+	get_mcp_servers: { params: undefined; result: McpServers };
+	manage_mcp_server: { params: ManageMcpServerParams; result: McpServers };
 	get_skills: { params: undefined; result: SessionSkills };
 	set_disabled_skills: { params: SetDisabledSkillsParams; result: SessionSkills };
 	reload_skills: { params: undefined; result: SessionSkills };
