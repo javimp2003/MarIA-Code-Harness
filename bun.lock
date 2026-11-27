@@ -305,7 +305,7 @@
     },
     "packages/vscode-extension": {
       "name": "maria-code",
-      "version": "0.47.0",
+      "version": "0.48.1",
       "devDependencies": {
         "@oh-my-pi/pi-coding-agent": "catalog:",
         "@oh-my-pi/pi-utils": "catalog:",

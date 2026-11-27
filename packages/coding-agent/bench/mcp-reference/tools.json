@@ -1,0 +1,4 @@
+[
+ {"name":"read","description":"Read a file, directory or xd:// tool documentation.","parameters":{"type":"object","properties":{"path":{"type":"string"}},"required":["path"],"additionalProperties":false}},
+ {"name":"write","description":"Write file content or execute an xd:// tool with JSON arguments in content.","parameters":{"type":"object","properties":{"path":{"type":"string"},"content":{"type":"string"}},"required":["path","content"],"additionalProperties":false}}
+]

@@ -5,6 +5,7 @@
  * resend) makes it editable again.
  */
 import { button, h } from "../dom";
+import { expandDraftMentions, updateDraftMentions, type DraftMention } from "./draft-mentions";
 
 export class MessageEditor {
 	readonly #message: HTMLElement;
@@ -13,6 +14,8 @@ export class MessageEditor {
 	readonly #send: HTMLButtonElement;
 	readonly #cancel: HTMLButtonElement;
 	#sending = false;
+	#mentions: DraftMention[];
+	#previous: string;
 
 	/**
 	 * @param message the `.msg.user` element; its children are hidden while editing
@@ -23,7 +26,10 @@ export class MessageEditor {
 		text: string,
 		private readonly onSend: (text: string) => void,
 		private readonly onClose: () => void,
+		mentions: DraftMention[] = [],
 	) {
+		this.#mentions = mentions;
+		this.#previous = text;
 		this.#message = message;
 		this.#input = h("textarea", {
 			className: "message-editor-input",
@@ -42,7 +48,11 @@ export class MessageEditor {
 			thumbs,
 			h("div", { className: "message-editor-actions" }, this.#cancel, this.#send),
 		);
-		this.#input.addEventListener("input", () => this.#refresh());
+		this.#input.addEventListener("input", () => {
+			this.#mentions = updateDraftMentions(this.#previous, this.#input.value, this.#mentions);
+			this.#previous = this.#input.value;
+			this.#refresh();
+		});
 		this.#input.addEventListener("keydown", event => {
 			if (event.isComposing || event.keyCode === 229) return;
 			if (event.key === "Enter" && !event.shiftKey) {
@@ -80,7 +90,7 @@ export class MessageEditor {
 		if (this.#sending || !this.#canSend()) return;
 		this.#sending = true;
 		this.#refresh();
-		this.onSend(text);
+		this.onSend(expandDraftMentions(text, this.#mentions));
 	}
 
 	#canSend(): boolean {

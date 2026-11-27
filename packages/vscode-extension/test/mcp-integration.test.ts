@@ -4,6 +4,8 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { OmpProcess } from "../src/rpc/omp-process";
 import { mcpFormRequest } from "../webview/mcp/form";
+import { handleSessionNotice } from "../src/chat/session-notices";
+import { searchMcpMentions } from "../src/chat/mcp-mentions";
 
 const fixture = path.resolve(import.meta.dir, "../../coding-agent/test/fixtures/mcp-ui-rpc-agent.ts");
 const serverFixture = path.resolve(import.meta.dir, "../../coding-agent/test/fixtures/readiness-mcp.ts");
@@ -58,6 +60,7 @@ describe("visual MCP management over the extension's real RPC client", () => {
 		expect(snapshot.servers).toEqual([
 			expect.objectContaining({ name: "local", scope: "project", status: "connected", tools: 1 }),
 		]);
+		expect(searchMcpMentions(snapshot, "loc").entries).toEqual([{ kind: "mcp", name: "local", tools: 1 }]);
 		const test = await rpc.request("manage_mcp_server", { op: "test", name: "local", scope: "project" });
 		expect(test.message).toContain("1 herramientas");
 		const disabled = await rpc.request("manage_mcp_server", {
@@ -67,12 +70,60 @@ describe("visual MCP management over the extension's real RPC client", () => {
 			enabled: false,
 		});
 		expect(disabled.servers[0]).toMatchObject({ status: "disabled", tools: 0, enabled: false });
+		expect(searchMcpMentions(disabled, "loc").entries).toEqual([]);
 		const persisted = await Bun.file(snapshot.projectConfigPath).json();
 		expect(persisted.mcpServers.local.enabled).toBe(false);
 		await rpc.request("manage_mcp_server", { op: "set_enabled", name: "local", scope: "project", enabled: true });
 		const removed = await rpc.request("manage_mcp_server", { op: "remove", name: "local", scope: "project" });
 		expect(removed.servers).toEqual([]);
 		expect((await Bun.file(snapshot.projectConfigPath).json()).mcpServers).toEqual({});
+	}, 20_000);
+
+	it("keeps MCP registration in the log when connecting and opening another chat with the saved server", async () => {
+		const banners: string[] = [];
+		const log: string[] = [];
+		const observe = (process: OmpProcess) =>
+			process.on("frame", frame => {
+				if (frame.type !== "notice") return;
+				handleSessionNotice(frame, {
+					notice: (_level, message) => banners.push(message),
+					log: line => log.push(line),
+				});
+			});
+		observe(rpc);
+		await rpc.request("manage_mcp_server", {
+			op: "add",
+			name: "docs",
+			scope: "user",
+			transport: "stdio",
+			command: process.execPath,
+			args: [serverFixture],
+			cwd: root,
+		});
+		await rpc.request("manage_mcp_server", { op: "test", name: "docs", scope: "user" });
+		expect(log.some(line => line.includes("mcp__docs_"))).toBe(true);
+		expect(banners).toEqual([]);
+
+		const logBefore = log.length;
+		const otherChat = new OmpProcess(rpc.command);
+		observe(otherChat);
+		try {
+			await otherChat.start([]);
+			// Initial discovery can finish before RPC subscribes. Reload after ready to exercise the live diagnostics deterministically.
+			await otherChat.request("manage_mcp_server", { op: "reload" });
+			await otherChat.request("manage_mcp_server", { op: "test", name: "docs", scope: "user" });
+			let snapshot = await otherChat.request("get_mcp_servers");
+			for (let i = 0; i < 30 && snapshot.servers[0]?.status === "connecting"; i++) {
+				await Bun.sleep(20);
+				snapshot = await otherChat.request("get_mcp_servers");
+			}
+			expect(snapshot.servers[0]).toMatchObject({ name: "docs", status: "connected", tools: 1 });
+			expect(searchMcpMentions(snapshot, "doc").entries).toEqual([{ kind: "mcp", name: "docs", tools: 1 }]);
+			expect(log.slice(logBefore).some(line => line.includes("mcp__docs_"))).toBe(true);
+			expect(banners).toEqual([]);
+		} finally {
+			await otherChat.stop();
+		}
 	}, 20_000);
 
 	it("connects an HTTP server using literal credentials, keeps them out of the list and preserves existing user configuration", async () => {

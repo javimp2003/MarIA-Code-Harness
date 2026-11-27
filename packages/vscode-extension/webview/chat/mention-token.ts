@@ -1,26 +1,33 @@
-/** `@` mentions in composer and prompt text, matched the way omp's `extractFileMentions` reads them. */
+/** File (`@`) and MCP (`#`) completion tokens. File mentions follow omp's `extractFileMentions`. */
 
 /** A character after which an `@` starts a mention (omp's `MENTION_BOUNDARY_REGEX`). */
 const BOUNDARY = /[\s([{<"'`]/;
 /** Punctuation omp strips from the end of an unquoted mention. */
 const TRAILING_PUNCTUATION = /[)\]}>.,;:!?"'`]+$/;
 
-/** The `@token` ending at `cursor`: where its `@` is and what follows it. */
-export function mentionToken(value: string, cursor: number): { start: number; query: string } | undefined {
-	const match = /(^|[\s([{<"'`])@([^\s@]*)$/.exec(value.slice(0, cursor));
+/** The mention token ending at `cursor`: where its marker is and what follows it. */
+export function mentionToken(
+	value: string,
+	cursor: number,
+	marker: "@" | "#" = "@",
+): { start: number; query: string } | undefined {
+	const pattern = marker === "@" ? /(^|[\s([{<"'`])@([^\s@]*)$/ : /(^|[\s([{<"'`])#([^\s#]*)$/;
+	const match = pattern.exec(value.slice(0, cursor));
 	if (!match) return undefined;
 	return { start: match.index + match[1]!.length, query: match[2]! };
 }
 
-/** Replace the whole `@token` around `cursor` with `mention` (and a space unless one follows), keeping the text around it. */
+/** Replace the whole token around `cursor` with `mention` (and a space unless one follows), keeping surrounding text. */
 export function replaceMention(
 	value: string,
 	cursor: number,
 	mention: string,
+	marker: "@" | "#" = "@",
 ): { value: string; cursor: number } | undefined {
-	const token = mentionToken(value, cursor);
+	const token = mentionToken(value, cursor, marker);
 	if (!token) return undefined;
-	const end = cursor + (/^[^\s@]*/.exec(value.slice(cursor))?.[0].length ?? 0);
+	const suffixPattern = marker === "@" ? /^[^\s@]*/ : /^[^\s#]*/;
+	const end = cursor + (suffixPattern.exec(value.slice(cursor))?.[0].length ?? 0);
 	const suffix = value.slice(end);
 	const inserted = mention + (!suffix || !/^\s/.test(suffix) ? " " : "");
 	return {

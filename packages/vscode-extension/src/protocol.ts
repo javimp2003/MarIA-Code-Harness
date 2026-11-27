@@ -271,6 +271,13 @@ export interface WorkspaceMention {
 	openPath: string;
 }
 
+/** A connected MCP server offered by the composer's `#` picker. */
+export interface McpMention {
+	kind: "mcp";
+	name: string;
+	tools: number;
+}
+
 /** Host → chat webview. */
 export type ChatUpdate =
 	| { type: "status"; status: AgentStatus }
@@ -314,6 +321,7 @@ export type ChatUpdate =
 	| { type: "skills"; skills: SessionSkill[]; editable: boolean }
 	/** Answer to `searchMentions`. */
 	| { type: "mentionResults"; requestId: number; entries: WorkspaceMention[]; limited: boolean; error?: string }
+	| { type: "mcpMentionResults"; requestId: number; entries: McpMention[]; connecting: boolean; error?: string }
 	/** Text printed by a local slash command (no agent turn). */
 	| { type: "commandOutput"; text: string }
 	/** Banner (errors, info) shown above the composer; it fades out on its own after a few seconds. */
@@ -424,6 +432,8 @@ export type ChatRequest =
 	| { type: "attachFiles" }
 	/** Search workspace files and folders for the composer's `@` popup; `fresh` rebuilds the index. */
 	| { type: "searchMentions"; requestId: number; query: string; fresh: boolean }
+	/** Search the shown chat's MCP connections for `#` mentions; also available without a workspace. */
+	| { type: "searchMcpMentions"; requestId: number; query: string }
 	| { type: "setModel"; provider: string; modelId: string }
 	| { type: "setThinkingLevel"; level: ThinkingLevel }
 	/** Enter or leave omp's plan mode, then send `prompt` if given (`/plan <prompt>`); the host replies with a fresh `state`. */

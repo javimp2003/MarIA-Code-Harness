@@ -54,6 +54,12 @@ export function handleMarkdownClick(event: MouseEvent, target: Element, post: (r
 		});
 		return true;
 	}
+	const mcp = target.closest<HTMLElement>("[data-mcp-server]");
+	if (mcp) {
+		event.preventDefault();
+		post({ type: "openMcp" });
+		return true;
+	}
 	const file = target.closest<HTMLElement>("[data-file]");
 	if (file) {
 		event.preventDefault();

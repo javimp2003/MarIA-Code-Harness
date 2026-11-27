@@ -6962,3 +6962,38 @@ body.vscode-high-contrast-light .picker-trigger .icon.picker-gateway {
 .slash-item > .icon-folder {
 	color: var(--omp-accent);
 }
+
+/* MCP mentions reuse the composer completion menu and its existing file-link styling. */
+.mention-heading {
+	padding: 8px 10px 5px;
+	color: var(--c-fg-3);
+	font-size: var(--fs-sm);
+}
+
+.slash-name.mcp-mention-name {
+	flex: 0 1 auto;
+	min-width: 0;
+	max-width: 60%;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+
+.mcp-mention-manage {
+	display: block;
+	width: 100%;
+	padding: 8px 10px;
+	border: none;
+	border-top: 1px solid var(--c-border);
+	background: none;
+	color: var(--c-fg-3);
+	text-align: left;
+	cursor: pointer;
+	font: inherit;
+	font-size: var(--fs-sm);
+}
+
+.mcp-mention-manage:hover,
+.mcp-mention-manage:focus-visible {
+	background: var(--c-hover);
+	color: var(--c-fg);
+}

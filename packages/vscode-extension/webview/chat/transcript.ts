@@ -15,6 +15,7 @@ import type {
 	ToolResultMessage,
 } from "../../src/protocol";
 import { isSkillPromptDetails, isUserPrompt, type SkillPromptDetails, skillPromptDraft } from "../../src/protocol";
+import { displayMcpReferences, splitMcpReferences } from "../../src/mcp-reference";
 import { parseQuotedPrompt, type QuotedPrompt, quotedPrompt } from "../../src/quoted-prompt";
 import { finalAnswerBlocks } from "../../src/search-text";
 import { button, h, iconButton } from "../dom";
@@ -28,6 +29,7 @@ import { countLines, isLongText } from "./long-text";
 import { playFarewell, preloadFarewell } from "./logo-farewell";
 import { markdownClipboard, renderMarkdown } from "./markdown";
 import { MessageEditor } from "./message-editor";
+import { compactMcpDraft } from "./draft-mentions";
 import { splitMentions } from "./mention-token";
 import { SelectionReply } from "./selection-reply";
 import { hiddenNoticeElement, isSkillUpdateDetails, noticeElement, skillUpdateElement } from "./notices";
@@ -225,14 +227,30 @@ function bubble(text: string, images: ImageContent[], onEdit?: () => void, quote
 	}
 	if (text) {
 		const content = h("div", { className: "bubble-text" });
-		for (const part of splitMentions(text))
-			content.append(typeof part === "string" ? part : fileLink(part.path, part.label));
-		body.append(foldLong(content, text));
+		for (const reference of splitMcpReferences(text)) {
+			if (typeof reference !== "string") {
+				content.append(
+					h(
+						"a",
+						{
+							className: "file-link mcp-link",
+							tabIndex: 0,
+							dataset: { mcpServer: reference.server, tooltip: `Servidor MCP: ${reference.server}` },
+						},
+						reference.label,
+					),
+				);
+			} else {
+				for (const part of splitMentions(reference))
+					content.append(typeof part === "string" ? part : fileLink(part.path, part.label));
+			}
+		}
+		body.append(foldLong(content, displayMcpReferences(text)));
 	}
 	if (images.length > 0) {
 		body.append(h("div", { className: "thumbs" }, ...images.map(image => thumbnail(image))));
 	}
-	el.append(body, messageActions(text, onEdit));
+	el.append(body, messageActions(displayMcpReferences(text), onEdit));
 	return el;
 }
 
@@ -472,7 +490,7 @@ export class Transcript {
 	#emptyHint = h(
 		"div",
 		{ className: "empty-hint" },
-		"Escribe / para comandos y skills · Shift+Enter para nueva línea",
+		"@ archivos · / comandos y skills · # MCP · Shift+Enter para nueva línea",
 	);
 	/** Where the chat works (this project, or no workspace), under the title; hidden until the first `state`. */
 	#place = h("div", { className: "empty-place", hidden: true });
@@ -574,7 +592,7 @@ export class Transcript {
 		this.#scroller.addEventListener("click", event => this.#onClick(event));
 		this.#scroller.addEventListener("keydown", event => {
 			const target = event.target as HTMLElement;
-			if (event.key === "Enter" && target.matches("[data-file], [data-href], img.thumb")) {
+			if (event.key === "Enter" && target.matches("[data-file], [data-mcp-server], [data-href], img.thumb")) {
 				event.preventDefault();
 				target.click();
 			}
@@ -615,9 +633,10 @@ export class Transcript {
 	 */
 	#editPrompt(element: HTMLElement, ordinal: number, original: string, quote: QuotedPrompt | undefined): void {
 		this.#editor?.close();
+		const draft = compactMcpDraft(quote?.message ?? original);
 		const editor = new MessageEditor(
 			element,
-			quote?.message ?? original,
+			draft.text,
 			edited => {
 				this.post({
 					type: "editMessage",
@@ -629,6 +648,7 @@ export class Transcript {
 			() => {
 				if (this.#editor === editor) this.#editor = undefined;
 			},
+			draft.mentions,
 		);
 		this.#editor = editor;
 	}

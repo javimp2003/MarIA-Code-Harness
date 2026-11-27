@@ -2,6 +2,20 @@
 
 ## [Unreleased]
 
+## [0.48.1] - 2026-11-27
+
+### Added
+
+- Mention a connected MCP server with `#` or the MCP button beside the input, filter by name and select with arrows and Enter/Tab; references remain clickable in drafts and saved chats, including chats without a workspace.
+
+### Changed
+
+- Selected MCP mentions now explain their meaning to the model in a self-contained XML reference, preserving explicit exclusions and permissions; the chat, History, copy and prompt editing keep the compact `#name` labels, including older saved references.
+
+### Fixed
+
+- Internal MCP tool registration messages no longer appear as popups above the input when opening or switching chats; diagnostics remain in the MarIA Code log.
+
 ## [0.47.0]
 
 ### Added

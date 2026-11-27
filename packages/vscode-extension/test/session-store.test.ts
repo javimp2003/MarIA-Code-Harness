@@ -3,6 +3,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { quotedPrompt } from "../src/quoted-prompt";
+import { mcpReference } from "../src/mcp-reference";
 import { guessSessionDir, listSessions, sessionLabel, sessionOrigins } from "../src/sessions/session-store";
 
 const dirs: string[] = [];
@@ -51,6 +52,26 @@ function sessionFile(options: {
 }
 
 describe("listSessions", () => {
+	it("shows selected MCP names in History previews without exposing model-facing instructions, also in quoted replies", async () => {
+		const dir = await tempDir();
+		await Bun.write(
+			path.join(dir, "mcp.jsonl"),
+			sessionFile({
+				id: "mcp",
+				prompts: [
+					`Consulta ${mcpReference("docs")} sobre OAuth`,
+					quotedPrompt("Earlier answer", `Busca ${mcpReference("MaaS Docs")} y compáralo`),
+				],
+			}),
+		);
+		const [session] = await listSessions(dir);
+		expect(session).toMatchObject({
+			firstMessage: "Consulta #docs sobre OAuth",
+			firstMessageFull: "Consulta #docs sobre OAuth",
+			lastMessage: "Busca #MaaS Docs y compáralo",
+			lastMessageFull: "Busca #MaaS Docs y compáralo",
+		});
+	});
 	it("finds each branch's immediate origin from its persisted path or ID and keeps the mark after deletion", async () => {
 		const dir = await tempDir();
 		const original = path.join(dir, "2026-01-01_original.jsonl");

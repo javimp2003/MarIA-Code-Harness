@@ -1,13 +1,36 @@
-/** A compact mention in the draft (`@name`) and the full mention it sends. */
-export interface DraftMention {
+import { mcpReference, splitMcpReferences } from "../../src/mcp-reference";
+
+/** A compact mention in the draft and the full reference it sends. */
+interface DraftMentionRange {
 	start: number;
 	end: number;
-	/** The text shown in the draft, `@name`. */
+	/** The text shown in the draft, `@file` or `#server`. */
 	label: string;
-	/** The `@path` sent in its place. */
+	/** The file path or explicit MCP identity sent in its place. */
 	mention: string;
-	/** Absolute path opened when the label is clicked. */
-	path: string;
+}
+
+export type DraftMention = DraftMentionRange & ({ kind?: "file"; path: string } | { kind: "mcp"; server: string });
+
+/** Restore saved references as editable labels; sending an intact label retains its server identity. */
+export function compactMcpDraft(prompt: string): { text: string; mentions: DraftMention[] } {
+	let text = "";
+	const mentions: DraftMention[] = [];
+	for (const part of splitMcpReferences(prompt)) {
+		if (typeof part === "string") text += part;
+		else {
+			mentions.push({
+				kind: "mcp",
+				start: text.length,
+				end: text.length + part.label.length,
+				label: part.label,
+				server: part.server,
+				mention: mcpReference(part.server),
+			});
+			text += part.label;
+		}
+	}
+	return { text, mentions };
 }
 
 /** Mentions after an edit from `previous` to `next`: those before it stay, those after it move, those it touched are dropped. */
@@ -33,7 +56,9 @@ export function expandDraftMentions(draft: string, mentions: readonly DraftMenti
 	let result = draft;
 	for (const entry of [...mentions].sort((a, b) => b.start - a.start)) {
 		if (draft.slice(entry.start, entry.end) === entry.label) {
-			result = result.slice(0, entry.start) + entry.mention + result.slice(entry.end);
+			// Draft state can survive an extension update; refresh the MCP hint from its saved identity.
+			const reference = entry.kind === "mcp" ? mcpReference(entry.server) : entry.mention;
+			result = result.slice(0, entry.start) + reference + result.slice(entry.end);
 		}
 	}
 	return result;

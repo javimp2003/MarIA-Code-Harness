@@ -1,0 +1,10 @@
+[
+ {"id":"prefer-archive","servers":["docs-archive"],"message":"Busca las instrucciones de autenticación de nuestra API.","allowed":["xd://mcp__docs_archive_search"],"mustCall":true},
+ {"id":"prefer-current","servers":["docs"],"message":"Busca las instrucciones de autenticación de nuestra API.","allowed":["xd://mcp__docs_search"],"mustCall":true},
+ {"id":"opaque-task","servers":["tickets"],"message":"Busca el estado de INC-1234.","allowed":["xd://mcp__tickets_search"],"mustCall":true},
+ {"id":"irrelevant","servers":["tickets"],"message":"Cuánto es 2 + 2? Responde solo el resultado.","allowed":[],"mustCall":false},
+ {"id":"excluded","servers":["docs"],"message":"No uses ningún MCP ni hagas llamadas a herramientas. Explica qué es OAuth de forma general.","allowed":[],"mustCall":false},
+ {"id":"unavailable","servers":["payroll"],"message":"Consulta el estado de mi nómina en este MCP.","allowed":[],"mustCall":false,"text":"payroll"},
+ {"id":"no-extra-actions","servers":["tickets"],"message":"Busca si ya existe un ticket sobre el error de login. No crees tickets.","allowed":["xd://mcp__tickets_search"],"mustCall":true},
+ {"id":"multiple","servers":["docs","tickets"],"message":"Busca tanto las instrucciones de autenticación como los tickets del error de login.","allowed":["xd://mcp__docs_search","xd://mcp__tickets_search"],"mustCall":true}
+]

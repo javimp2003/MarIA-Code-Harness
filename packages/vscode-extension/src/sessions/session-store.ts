@@ -10,6 +10,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 import { parseQuotedPrompt } from "../quoted-prompt";
+import { displayMcpReferences } from "../mcp-reference";
 
 export interface SessionSummary {
 	path: string;
@@ -368,7 +369,7 @@ function promptOf(content: unknown): Prompt | undefined {
 						.join(" ")
 				: "";
 	// A reply to selected text lists as what the user wrote, not the wrapper around it.
-	const text = (parseQuotedPrompt(joined)?.message ?? joined).trim();
+	const text = displayMcpReferences(parseQuotedPrompt(joined)?.message ?? joined).trim();
 	const firstLine = text.split("\n")[0]?.trim();
 	if (!firstLine) return undefined;
 	const whole = text.replace(/\s+/g, " ");

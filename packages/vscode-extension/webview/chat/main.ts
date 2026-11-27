@@ -146,6 +146,7 @@ function handle(update: ChatUpdate): void {
 			setStatus(update.status);
 			break;
 		case "history":
+			composer.resetMentionSearch();
 			askDialog.clear();
 			// The excerpt asked about belongs to the transcript being replaced.
 			askSelection.close();
@@ -199,6 +200,7 @@ function handle(update: ChatUpdate): void {
 			if (state.sessionFile !== sessionFile) {
 				// Another chat is shown: the banners on screen were about the previous one.
 				composer.clearNotices();
+				composer.resetMentionSearch();
 				sessionFile = state.sessionFile;
 				history.close();
 			}
@@ -266,6 +268,9 @@ function handle(update: ChatUpdate): void {
 			break;
 		case "skills":
 			composer.setSkills(update.skills, update.editable);
+			break;
+		case "mcpMentionResults":
+			composer.mcpMentionResults(update);
 			break;
 		case "mentionResults":
 			composer.mentionResults(update);

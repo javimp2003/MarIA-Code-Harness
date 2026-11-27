@@ -1,0 +1,1 @@
+[User-selected MCP server: {{name}}. Use its available tools when relevant to this request. Respect explicit exclusions and existing permissions. If unavailable, report it; never invent tools or results.]

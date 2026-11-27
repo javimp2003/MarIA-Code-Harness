@@ -115,7 +115,7 @@ export class Header {
 				this.#newTabAnchor,
 				this.#history,
 				this.#back,
-				iconButton("mcp", "Servidores MCP", () => post({ type: "openMcp" })),
+				iconButton("mcp", "Servidores MCP · escribe # para mencionarlos", () => post({ type: "openMcp" })),
 				iconButton("settings", "Settings", () => post({ type: "openSettings" })),
 			),
 		);

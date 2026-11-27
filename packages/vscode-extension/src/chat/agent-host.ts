@@ -53,6 +53,7 @@ import { assistantEntryIdAt } from "./assistant-entry";
 import { SubagentRequestLog } from "./subagent-requests";
 import { SubagentRoster } from "./subagent-roster";
 import { importSkills } from "../skills/import-skills";
+import { handleSessionNotice } from "./session-notices";
 
 /** How often a followed subagent's transcript is re-read while it runs. */
 const WATCH_POLL_MS = 2000;
@@ -71,6 +72,7 @@ const SCOPE_CHECKPOINT_NAMES: Record<ScopeCheckpointLevel, string> = {
 /** Notification frames that are not session events (everything else is forwarded as `event`). */
 const NON_EVENT_FRAMES: Record<string, true> = {
 	ready: true,
+	notice: true,
 	prompt_result: true,
 	session_settled: true,
 	extension_error: true,
@@ -1263,6 +1265,12 @@ export class AgentHost implements vscode.Disposable {
 		if (this.#process !== process) return;
 		this.#trackCheckpoint(frame);
 		switch (frame.type) {
+			case "notice":
+				handleSessionNotice(frame, {
+					log: line => this.log.appendLine(line),
+					notice: (level, message) => this.#notice(level, message),
+				});
+				break;
 			case "available_commands_update":
 				this.post({ type: "commands", commands: frame.commands });
 				// Skills changed (switched off, imported, rediscovered): their commands come and go with them.

@@ -34,6 +34,7 @@ import {
 import type { AgentPool } from "./agent-pool";
 import type { ExamplePromptStore } from "./example-prompt-store";
 import { mentionCandidates } from "./mentioned-file";
+import { searchMcpMentions } from "./mcp-mentions";
 import { WorkspaceMentionSearch } from "./workspace-mention-search";
 import { SEARCH_EXCLUDE } from "./workspace-mentions";
 
@@ -519,6 +520,27 @@ export class ChatSession implements vscode.Disposable, HostView {
 
 	async #handle(request: ChatRequest): Promise<void> {
 		switch (request.type) {
+			case "searchMcpMentions": {
+				const host = this.#host;
+				const process = host?.process;
+				try {
+					if (!process) throw new Error("MarIA Code is not running");
+					const result = searchMcpMentions(await process.request("get_mcp_servers"), request.query);
+					if (this.#host === host && host?.process === process)
+						this.post({ type: "mcpMentionResults", requestId: request.requestId, ...result });
+				} catch (error) {
+					this.log.appendLine(`MCP mention search failed: ${errorMessage(error)}`);
+					if (this.#host === host && host?.process === process)
+						this.post({
+							type: "mcpMentionResults",
+							requestId: request.requestId,
+							entries: [],
+							connecting: false,
+							error: "No se pueden cargar los MCP de este chat. Comprueba el motor y las conexiones en Servidores MCP.",
+						});
+				}
+				return;
+			}
 			case "searchMentions": {
 				const host = this.#host;
 				if (host?.noWorkspace) {

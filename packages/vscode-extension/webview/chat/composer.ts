@@ -20,7 +20,9 @@ import type {
 	SubagentView,
 	TodoPhase,
 	WorkspaceMention,
+	McpMention,
 } from "../../src/protocol";
+import { mcpReference } from "../../src/mcp-reference";
 import { parseQuotedPrompt, quotedPrompt } from "../../src/quoted-prompt";
 import { button, h, iconButton } from "../dom";
 import { icon } from "../icons";
@@ -28,7 +30,7 @@ import { setTooltip } from "../tooltip";
 import { CleanupOffer } from "./cleanup-offer";
 import { ContextMeter } from "./context-meter";
 import { DictationControl, type DictationState } from "./dictation";
-import { type DraftMention, expandDraftMentions, updateDraftMentions } from "./draft-mentions";
+import { compactMcpDraft, type DraftMention, expandDraftMentions, updateDraftMentions } from "./draft-mentions";
 import { EnhancePrompt } from "./enhance-prompt";
 import { GhostText, syncMirrorStyles } from "./ghost-text";
 import { openLightbox } from "./lightbox";
@@ -46,6 +48,7 @@ import { SubagentPanel } from "./subagent-panel";
 import type { LocalCommand } from "./local-commands";
 
 type Post = (request: ChatRequest) => void;
+type ComposerMention = WorkspaceMention | McpMention;
 type NoticeLevel = "info" | "warning" | "error";
 
 export interface ComposerOptions {
@@ -86,7 +89,7 @@ function pasteSummary(text: string): string {
 
 const PASTE_PREVIEW_LINES = 3;
 const MAX_SUGGESTIONS = 50;
-const PLACEHOLDER = "Pregunta lo que quieras a MarIA Code. / para comandos y skills";
+const PLACEHOLDER = "Pregunta a MarIA Code. @ archivos · / skills · # MCP";
 const PLACEHOLDER_BUSY = "Pide cambios adicionales";
 const PLACEHOLDER_PLAN = "Modo plan: describe qué quieres planificar";
 const PLACEHOLDER_DELEGATE = "Modo delegación: describe la tarea para los subagentes de MarIA Code";
@@ -152,6 +155,7 @@ export class Composer {
 	#stop: HTMLButtonElement;
 	#meter: ContextMeter;
 	#skills: SkillsPanel;
+	#mcpMentionButton: HTMLButtonElement;
 	#scopeCheckpoint: ScopeCheckpointPanel;
 	#asyncJobs: AsyncJobsPanel;
 	#todos = new TodoPanel();
@@ -176,9 +180,10 @@ export class Composer {
 	#selected = 0;
 	/** Draft text for which the user dismissed the popup with Escape. */
 	#dismissedFor: string | undefined;
-	/** Workspace entries the `@` popup lists. */
-	#mentionMatches: WorkspaceMention[] = [];
-	/** The popup shows `@` search results (not slash commands). */
+	/** File or MCP entries in the mention popup. */
+	#mentionMatches: ComposerMention[] = [];
+	#mentionKind: "file" | "mcp" | undefined;
+	/** The popup shows mention search results instead of slash commands. */
 	#mentionActive = false;
 	/** A search is on its way; Enter/Tab/arrows wait for it. */
 	#mentionPending = false;
@@ -189,7 +194,7 @@ export class Composer {
 	/** Id of the newest search; older answers are dropped. */
 	#mentionRequest = 0;
 	#mentionTimer: number | undefined;
-	/** Compact mentions in the draft (`@name` standing for a full `@path`). */
+	/** Compact file and MCP references in the draft. */
 	#draftMentions: DraftMention[] = [];
 	/** The draft the mentions' offsets refer to. */
 	#previousDraft = "";
@@ -233,6 +238,7 @@ export class Composer {
 		this.picker = new ModelPicker(post);
 		this.#meter = new ContextMeter(post);
 		this.#skills = new SkillsPanel(post, text => this.insertText(text));
+		this.#mcpMentionButton = iconButton("mcp", "Mencionar un MCP (#)", () => this.insertText("#"));
 		this.#scopeCheckpoint = new ScopeCheckpointPanel(post);
 		this.#asyncJobs = new AsyncJobsPanel(post);
 		this.#cleanupOffer = new CleanupOffer(post);
@@ -243,7 +249,7 @@ export class Composer {
 			// `@path` or `@"path with spaces"` → the path.
 			mentions: () =>
 				this.#draftMentions
-					.filter(entry => this.#input.value.slice(entry.start, entry.end) === entry.label)
+					.filter(entry => entry.kind !== "mcp" && this.#input.value.slice(entry.start, entry.end) === entry.label)
 					.map(entry => entry.mention.replace(/^@(["']?)([\s\S]*)\1$/, "$2")),
 			setRunning: running => {
 				this.#input.readOnly = running;
@@ -297,13 +303,18 @@ export class Composer {
 		});
 		this.#input.addEventListener("keydown", event => this.#onKeyDown(event));
 		this.#input.addEventListener("paste", event => this.#onPaste(event));
-		// A caret moved into or out of an `@token` opens or closes the mention popup.
+		// A caret moved into or out of an `@token` or `#token` opens or closes the mention popup.
 		this.#input.addEventListener("click", () => this.#updatePopup());
 		this.#input.addEventListener("keyup", event => {
 			if (event.key === "ArrowLeft" || event.key === "ArrowRight" || event.key === "Home" || event.key === "End")
 				this.#updatePopup();
 		});
-		this.#input.addEventListener("blur", () => setTimeout(() => this.#closePopup(), 150));
+		this.#input.addEventListener("blur", () =>
+			setTimeout(() => {
+				if (document.activeElement !== this.#input && !this.#popup.contains(document.activeElement))
+					this.#closePopup();
+			}, 150),
+		);
 		this.#popup.addEventListener("mousedown", event => event.preventDefault());
 
 		this.element = h(
@@ -338,6 +349,7 @@ export class Composer {
 						{ className: "composer-footer-right" },
 						this.#meter.element,
 						this.#skills.element,
+						this.#mcpMentionButton,
 						this.#enhance.button,
 						this.#dictation.element,
 						this.#todos.element,
@@ -601,10 +613,18 @@ export class Composer {
 
 	/** Replace the draft (example prompts) and focus. */
 	fill(text: string): void {
-		this.#input.value = text;
+		this.#loadDraft(text);
 		this.#historyIndex = -1;
 		this.#onInput();
 		this.focus();
+	}
+
+	/** Recalled MCP references stay compact and retain their identity when sent again. */
+	#loadDraft(text: string): void {
+		const draft = compactMcpDraft(text);
+		this.#input.value = draft.text;
+		this.#draftMentions = draft.mentions;
+		this.#previousDraft = draft.text;
 	}
 
 	/** Make the next prompt a reply to `text`, an excerpt of an answer; replaces an earlier one. */
@@ -625,12 +645,18 @@ export class Composer {
 	/** Whether the shown chat has a workspace: chats without one offer no `@` search. */
 	setWorkspaceEnabled(enabled: boolean): void {
 		this.#workspaceEnabled = enabled;
-		if (!enabled) this.#closePopup();
+		if (!enabled && this.#mentionKind === "file") this.#closePopup();
 	}
 
 	/** The host answered a `searchMentions` request. */
 	mentionResults(update: Extract<ChatUpdate, { type: "mentionResults" }>): void {
-		if (!this.#mentionActive || update.requestId !== this.#mentionRequest || !this.#mentionToken()) return;
+		if (
+			!this.#mentionActive ||
+			this.#mentionKind !== "file" ||
+			update.requestId !== this.#mentionRequest ||
+			!this.#mentionToken()
+		)
+			return;
 		this.#mentionPending = false;
 		this.#popup.ariaBusy = "false";
 		this.#mentionMatches = update.entries;
@@ -639,6 +665,35 @@ export class Composer {
 			update.error ??
 				(update.limited ? "More results available. Type a folder path to narrow the search." : undefined),
 		);
+	}
+
+	/** The current chat's MCP connections answered the `#` search. */
+	mcpMentionResults(update: Extract<ChatUpdate, { type: "mcpMentionResults" }>): void {
+		if (
+			!this.#mentionActive ||
+			this.#mentionKind !== "mcp" ||
+			update.requestId !== this.#mentionRequest ||
+			this.#mentionToken()?.kind !== "mcp"
+		)
+			return;
+		this.#mentionPending = false;
+		this.#popup.ariaBusy = "false";
+		this.#mentionMatches = update.entries.slice(0, MAX_SUGGESTIONS);
+		this.#selected = 0;
+		this.#renderMentions(
+			update.error ??
+				(update.connecting && update.entries.length === 0 ? "Conectando los servidores MCP…" : undefined),
+		);
+		if (update.connecting && update.entries.length === 0 && !update.error) {
+			window.clearTimeout(this.#mentionTimer);
+			this.#mentionTimer = window.setTimeout(() => this.#updatePopup(), 750);
+		}
+	}
+
+	/** A session change invalidates suggestions and responses from the previous chat. */
+	resetMentionSearch(): void {
+		this.#closePopup();
+		this.#mentionMatches = [];
 	}
 
 	focus(): void {
@@ -720,6 +775,7 @@ export class Composer {
 		this.#send.hidden = this.#busy && !hasContent;
 		// While "Mejorar prompt" works on the draft it is read-only and cannot be sent.
 		this.#send.disabled = !hasContent || this.#input.disabled || this.#input.readOnly;
+		this.#mcpMentionButton.disabled = this.#input.disabled || this.#input.readOnly;
 		setTooltip(this.#send, this.#busy ? "Queue message (Enter)" : "Send (Enter)");
 		this.#renderPlaceholder();
 		this.#ghost.setEnabled(!this.#input.disabled && !this.#input.readOnly && this.#dictation.state === "idle");
@@ -1088,7 +1144,7 @@ export class Composer {
 		}
 		this.#historyIndex += step;
 		const entry = entries[this.#historyIndex];
-		this.#input.value = entry?.text ?? "";
+		this.#loadDraft(entry?.text ?? "");
 		this.#images = entry ? [...entry.images] : [];
 		this.#quote = entry?.quote;
 		this.#renderAttachments();
@@ -1117,10 +1173,9 @@ export class Composer {
 		return { start, query: match[2]!, skillsOnly: start > 0 };
 	}
 
-	/** The `@token` at the caret, or undefined when the mention popup should not show. */
-	#mentionToken(): { start: number; query: string } | undefined {
+	/** The file or MCP token at the caret, or undefined when completion should not show. */
+	#mentionToken(): { start: number; query: string; kind: "file" | "mcp" } | undefined {
 		if (
-			!this.#workspaceEnabled ||
 			this.#input.disabled ||
 			this.#input.readOnly ||
 			this.#dismissedFor === this.#input.value ||
@@ -1128,7 +1183,10 @@ export class Composer {
 		) {
 			return undefined;
 		}
-		return mentionToken(this.#input.value, this.#input.selectionStart);
+		const file = this.#workspaceEnabled ? mentionToken(this.#input.value, this.#input.selectionStart) : undefined;
+		if (file) return { ...file, kind: "file" };
+		const mcp = mentionToken(this.#input.value, this.#input.selectionStart, "#");
+		return mcp ? { ...mcp, kind: "mcp" } : undefined;
 	}
 
 	#renderMentions(message?: string): void {
@@ -1137,38 +1195,68 @@ export class Composer {
 				const item = h(
 					"div",
 					{ className: "slash-item", role: "option", ariaSelected: String(index === this.#selected) },
-					icon(entry.kind === "folder" ? "folder" : "file"),
-					h("span", { className: "slash-name" }, entry.kind === "folder" ? `${entry.name}/` : entry.name),
+					icon(entry.kind === "mcp" ? "mcp" : entry.kind === "folder" ? "folder" : "file"),
+					h(
+						"span",
+						{
+							className: entry.kind === "mcp" ? "slash-name mcp-mention-name" : "slash-name",
+							dataset: entry.kind === "mcp" ? { tooltip: entry.name } : undefined,
+						},
+						entry.kind === "mcp" ? `#${entry.name}` : entry.kind === "folder" ? `${entry.name}/` : entry.name,
+					),
 					// The folder it is in; the name is already shown.
 					h(
 						"span",
-						{ className: "slash-desc", dataset: { tooltip: entry.path } },
-						entry.path.split("/").slice(0, -1).join("/"),
+						{ className: "slash-desc", dataset: { tooltip: entry.kind === "mcp" ? entry.name : entry.path } },
+						entry.kind === "mcp"
+							? `${entry.tools} ${entry.tools === 1 ? "herramienta" : "herramientas"} · Conectado`
+							: entry.path.split("/").slice(0, -1).join("/"),
 					),
 				);
 				item.addEventListener("click", () => this.#completeMention(entry));
 				return item;
 			}),
 		);
+		if (this.#mentionKind === "mcp") {
+			this.#popup.prepend(h("div", { className: "mention-heading" }, "Servidores MCP · #"));
+		}
 		if (message || this.#mentionMatches.length === 0) {
 			this.#popup.append(
-				h("div", { className: "slash-item slash-desc" }, message ?? "No matching files or folders"),
+				h(
+					"div",
+					{ className: "slash-item slash-desc" },
+					message ??
+						(this.#mentionKind === "mcp"
+							? "No hay MCP conectados que coincidan."
+							: "No matching files or folders"),
+				),
 			);
 		}
-		this.#popup.children[this.#selected]?.scrollIntoView({ block: "nearest" });
+		if (this.#mentionKind === "mcp") {
+			this.#popup.append(
+				button("Gestionar servidores MCP…", "mcp-mention-manage", () => {
+					this.#closePopup();
+					this.post({ type: "openMcp" });
+				}),
+			);
+		}
+		this.#popup.querySelectorAll("[role=option]")[this.#selected]?.scrollIntoView({ block: "nearest" });
 	}
 
-	/** Replace the `@token` at the caret with `entry`'s compact `@name`, which sends its full mention. */
-	#completeMention(entry: WorkspaceMention): void {
+	/** Replace the token at the caret with a compact file or MCP reference. */
+	#completeMention(entry: ComposerMention): void {
 		const token = this.#mentionToken();
 		if (this.#mentionPending || !token) return;
-		const label = `@${entry.name}`;
-		const result = replaceMention(this.#input.value, this.#input.selectionEnd, label);
+		const marker = entry.kind === "mcp" ? "#" : "@";
+		const label = `${marker}${entry.name}`;
+		const result = replaceMention(this.#input.value, this.#input.selectionEnd, label, marker);
 		if (!result) return;
-		this.#draftMentions = [
-			...updateDraftMentions(this.#input.value, result.value, this.#draftMentions),
-			{ start: token.start, end: token.start + label.length, label, mention: entry.mention, path: entry.openPath },
-		];
+		const range = { start: token.start, end: token.start + label.length, label };
+		const selected: DraftMention =
+			entry.kind === "mcp"
+				? { ...range, kind: "mcp", server: entry.name, mention: mcpReference(entry.name) }
+				: { ...range, mention: entry.mention, path: entry.openPath };
+		this.#draftMentions = [...updateDraftMentions(this.#input.value, result.value, this.#draftMentions), selected];
 		this.#input.value = result.value;
 		this.#previousDraft = result.value;
 		this.#input.setSelectionRange(result.cursor, result.cursor);
@@ -1203,17 +1291,23 @@ export class Composer {
 			nodes.push(value.slice(offset, entry.start));
 			const link = h(
 				"a",
-				{ className: "draft-mention-link", tabIndex: 0, dataset: { tooltip: entry.path } },
+				{
+					className: "draft-mention-link",
+					tabIndex: 0,
+					dataset: { tooltip: entry.kind === "mcp" ? `Servidor MCP: ${entry.server}` : entry.path },
+				},
 				entry.label,
 			);
 			link.addEventListener("click", event => {
 				event.preventDefault();
-				this.post({ type: "openFile", path: entry.path });
+				if (entry.kind === "mcp") this.post({ type: "openMcp" });
+				else this.post({ type: "openFile", path: entry.path });
 			});
 			link.addEventListener("keydown", event => {
 				if (event.key !== "Enter") return;
 				event.preventDefault();
-				this.post({ type: "openFile", path: entry.path });
+				if (entry.kind === "mcp") this.post({ type: "openMcp" });
+				else this.post({ type: "openFile", path: entry.path });
 			});
 			nodes.push(link);
 			offset = entry.end;
@@ -1228,13 +1322,14 @@ export class Composer {
 	#updatePopup(): void {
 		const mention = this.#mentionToken();
 		if (mention) {
-			if (!this.#mentionActive) {
+			if (!this.#mentionActive || this.#mentionKind !== mention.kind) {
 				this.#mentionFresh = true;
 				this.#mentionMatches = [];
 				this.#selected = 0;
 				this.#popup.replaceChildren(h("div", { className: "slash-item slash-desc" }, "Searching…"));
 			}
 			this.#mentionActive = true;
+			this.#mentionKind = mention.kind;
 			this.#mentionPending = true;
 			this.#popup.ariaBusy = "true";
 			this.#popup.hidden = false;
@@ -1243,11 +1338,13 @@ export class Composer {
 			this.#mentionTimer = window.setTimeout(() => {
 				const fresh = this.#mentionFresh;
 				this.#mentionFresh = false;
-				this.post({ type: "searchMentions", requestId, query: mention.query, fresh });
+				if (mention.kind === "mcp") this.post({ type: "searchMcpMentions", requestId, query: mention.query });
+				else this.post({ type: "searchMentions", requestId, query: mention.query, fresh });
 			}, 100);
 			return;
 		}
 		this.#mentionActive = false;
+		this.#mentionKind = undefined;
 		this.#mentionPending = false;
 		this.#popup.ariaBusy = "false";
 		const token = this.#slashToken();
@@ -1320,6 +1417,7 @@ export class Composer {
 		// An answer still on its way no longer applies.
 		this.#mentionRequest++;
 		this.#mentionActive = false;
+		this.#mentionKind = undefined;
 		this.#mentionPending = false;
 		this.#popup.ariaBusy = "false";
 		this.#popup.hidden = true;
